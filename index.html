@@ -19,21 +19,21 @@
 <style>
 /* ── DESIGN TOKENS ── */
 :root {
-  --bg:         #d8d8d8;
-  --sidebar:    #ffffff;
-  --panel:      #f5f5f5;
-  --surface-1:  #fafafa;
-  --surface-2:  #e4e4e4;
-  --border:     rgba(0,0,0,0.08);
-  --border-hi:  rgba(0,0,0,0.14);
-  --accent:     #1a1a1a;
-  --accent-lo:  rgba(26,26,26,0.07);
-  --accent-glo: rgba(26,26,26,0.14);
-  --accent2:    #dc2626;
-  --text:       #111111;
-  --muted:      #909090;
-  --muted-hi:   #525252;
-  --success:    #16a34a;
+  --bg:         #17102b;
+  --sidebar:    #221741;
+  --panel:      #2a1c4f;
+  --surface-1:  #251947;
+  --surface-2:  #35256b;
+  --border:     rgba(255,255,255,0.09);
+  --border-hi:  rgba(255,255,255,0.18);
+  --accent:     #a78bfa;
+  --accent-lo:  rgba(167,139,250,0.12);
+  --accent-glo: rgba(167,139,250,0.25);
+  --accent2:    #f472b6;
+  --text:       #f2eeff;
+  --muted:      #9d8fc4;
+  --muted-hi:   #c4b5e8;
+  --success:    #4ade80;
   --header-h:   52px;
 }
 
@@ -3435,6 +3435,10 @@ input[type="number"]:focus { border-color: var(--accent); }
       <span class="card-chevron">▾</span>
     </div>
     <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="section-sublabel" style="margin:0;">Board writing sound</span>
+        <button class="toggle on" id="scribble-toggle" onclick="toggleScribble()" title="Marker-on-board sound while the hand draws"></button>
+      </div>
       <div>
         <div class="section-sublabel">Voiceover</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -3642,7 +3646,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div class="section-sublabel">Image Reveal</div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="image-reveal" style="accent-color:#1a1a1a;width:14px;height:14px;" onchange="toggleRevealAnimPicker()">
+            <input type="checkbox" id="image-reveal" style="accent-color:#a78bfa;width:14px;height:14px;" onchange="toggleRevealAnimPicker()">
             <span>Reveal original image at end</span>
           </label>
           <div style="font-size:10px;color:var(--muted);line-height:1.4;">
@@ -3687,7 +3691,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;">
           <div class="section-sublabel">Outline overlay</div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="outline-visible" checked style="accent-color:#1a1a1a;width:14px;height:14px;"
+            <input type="checkbox" id="outline-visible" checked style="accent-color:#a78bfa;width:14px;height:14px;"
               onchange="setOutlineVisible(this.checked)">
             <span>Show outlines on export</span>
           </label>
@@ -3709,7 +3713,7 @@ input[type="number"]:focus { border-color: var(--accent); }
             <span style="font-size:11px;color:var(--muted);">Pick a color or enable auto-detect below</span>
           </div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="of-outline-autocolor" checked style="accent-color:#1a1a1a;width:14px;height:14px;"
+            <input type="checkbox" id="of-outline-autocolor" checked style="accent-color:#a78bfa;width:14px;height:14px;"
               onchange="document.getElementById('of-outline-color').disabled=this.checked;document.getElementById('of-outline-color').style.opacity=this.checked?0.4:1;">
             <span>Auto-detect color from image</span>
           </label>
@@ -3740,7 +3744,7 @@ input[type="number"]:focus { border-color: var(--accent); }
           <span style="font-size:11px;color:var(--muted);">Pick a color or enable auto-detect below</span>
         </div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-          <input type="checkbox" id="outlineonly-autocolor" style="accent-color:#1a1a1a;width:14px;height:14px;"
+          <input type="checkbox" id="outlineonly-autocolor" style="accent-color:#a78bfa;width:14px;height:14px;"
             onchange="document.getElementById('outlineonly-color').disabled=this.checked; document.getElementById('outlineonly-color').style.opacity=this.checked?0.4:1;">
           <span>Auto-detect color from image</span>
         </label>
@@ -3754,7 +3758,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         </div>
         <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="outlineonly-colorregion" style="accent-color:#1a1a1a;width:14px;height:14px;"
+            <input type="checkbox" id="outlineonly-colorregion" style="accent-color:#a78bfa;width:14px;height:14px;"
               onchange="if(this.checked){document.getElementById('outlineonly-realimage').checked=false;}">
             <span style="font-weight:600;color:var(--text);">Color Region Outlines</span>
           </label>
@@ -3764,7 +3768,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         </div>
         <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="outlineonly-realimage" style="accent-color:#1a1a1a;width:14px;height:14px;"
+            <input type="checkbox" id="outlineonly-realimage" style="accent-color:#a78bfa;width:14px;height:14px;"
               onchange="if(this.checked){document.getElementById('outlineonly-colorregion').checked=false;}">
             <span style="font-weight:600;color:var(--text);">Real Image Edges</span>
           </label>
@@ -3811,7 +3815,7 @@ input[type="number"]:focus { border-color: var(--accent); }
               <span style="font-size:11px;color:var(--muted);">Pick a color or auto-detect</span>
             </div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);margin-top:6px;">
-              <input type="checkbox" id="text-outline-autocolor" style="accent-color:#1a1a1a;width:14px;height:14px;"
+              <input type="checkbox" id="text-outline-autocolor" style="accent-color:#a78bfa;width:14px;height:14px;"
                 onchange="document.getElementById('text-outline-color').disabled=this.checked;document.getElementById('text-outline-color').style.opacity=this.checked?0.4:1;">
               <span>Auto-detect color from image</span>
             </label>
@@ -4033,9 +4037,9 @@ input[type="number"]:focus { border-color: var(--accent); }
         </div>
         <div class="bb-slider-row">
           <span style="width:38px;flex-shrink:0;">Hand</span>
-          <input type="range" id="hand-speed-slider" min="1" max="20" value="6"
+          <input type="range" id="hand-speed-slider" min="1" max="20" value="18"
             oninput="updateSliderFill(this);document.getElementById('hand-speed-val').textContent=this.value">
-          <span class="slider-val" id="hand-speed-val">6</span>
+          <span class="slider-val" id="hand-speed-val">18</span>
         </div>
       </div>
     </div>
@@ -4650,7 +4654,7 @@ function loadProject(projectId) {
                 visible: layerData.visible !== undefined ? layerData.visible : true,
                 groupId: layerData.groupId || null,
                 speed: layerData.speed !== undefined ? layerData.speed : 40,
-                handSpeed: layerData.handSpeed !== undefined ? layerData.handSpeed : 6,
+                handSpeed: layerData.handSpeed !== undefined ? layerData.handSpeed : 18,
                 chunks: layerData.chunks !== undefined ? layerData.chunks : 30,
                 specChunks: layerData.specChunks !== undefined ? layerData.specChunks : 35,
                 hasPngAlpha: layerData.hasPngAlpha || false,
@@ -5243,7 +5247,7 @@ function _applySnapshot(snap, label) {
           visible: ld.visible !== undefined ? ld.visible : true,
           groupId: ld.groupId || null,
           speed: ld.speed !== undefined ? ld.speed : 40,
-          handSpeed: ld.handSpeed !== undefined ? ld.handSpeed : 6,
+          handSpeed: ld.handSpeed !== undefined ? ld.handSpeed : 18,
           chunks: ld.chunks !== undefined ? ld.chunks : 30,
           specChunks: ld.specChunks !== undefined ? ld.specChunks : 35,
           hasPngAlpha: ld.hasPngAlpha || false,
@@ -5671,7 +5675,7 @@ window.addEventListener('load', () => {
         if (el) { el.value = val; document.getElementById(valId).textContent = val; updateSliderFill(el); }
       };
       setSlider('speed-slider',      'speed-val',      layer.speed      ?? 40);
-      setSlider('hand-speed-slider', 'hand-speed-val', layer.handSpeed  ?? 6);
+      setSlider('hand-speed-slider', 'hand-speed-val', layer.handSpeed  ?? 18);
       setSlider('tile-slider',       'tile-val',       layer.chunks     ?? 30);
       setSlider('spec-tile-slider',  'spec-tile-val',  layer.specChunks ?? 35);
 
@@ -6004,7 +6008,7 @@ function addLayer(img, name) {
     visible: true,
     groupId: null,
     speed: 40,
-    handSpeed: 6,
+    handSpeed: 18,
     chunks: 68,
     specChunks: 35,
     hasPngAlpha };
@@ -6122,7 +6126,7 @@ function syncSidebarToLayer(id) {
     }
   };
   setSlider('speed-slider',      'speed-val',      layer.speed     ?? 40);
-  setSlider('hand-speed-slider', 'hand-speed-val', layer.handSpeed ?? 6);
+  setSlider('hand-speed-slider', 'hand-speed-val', layer.handSpeed ?? 18);
   setSlider('tile-slider',       'tile-val',       layer.chunks    ?? 30);
   setSlider('spec-tile-slider',  'spec-tile-val',  layer.specChunks?? 35);
   // BUG FIX: sync zigzag toggle to per-layer state
@@ -6346,7 +6350,7 @@ function _runGroupAt(gpos) {
       if (el) { el.value = val; document.getElementById(valId).textContent = val; }
     };
     _setSlider('speed-slider',      'speed-val',      slot.layer.speed      ?? 40);
-    _setSlider('hand-speed-slider', 'hand-speed-val', slot.layer.handSpeed  ?? 6);
+    _setSlider('hand-speed-slider', 'hand-speed-val', slot.layer.handSpeed  ?? 18);
     _setSlider('tile-slider',       'tile-val',       slot.layer.chunks     ?? 30);
     _setSlider('spec-tile-slider',  'spec-tile-val',  slot.layer.specChunks ?? 35);
 
@@ -7315,7 +7319,7 @@ function captureCurrentSettings() {
     hand:               state.hand               || 'custom1',
     zigzag:             state.zigzag             ?? true,
     speed:              +(document.getElementById('speed-slider')?.value      ?? 40),
-    handSpeed:          +(document.getElementById('hand-speed-slider')?.value ?? 6),
+    handSpeed:          +(document.getElementById('hand-speed-slider')?.value ?? 18),
     outlineDetect:      state.outlineDetect       ?? 50,
     outlineAlgorithm:   state.outlineAlgorithm    || 'classic',
     outlineStrokeStyle: state.outlineStrokeStyle  || 'default',
@@ -8619,7 +8623,7 @@ function _commitTextLayer(text) {
       visible:    _oldLayer ? _oldLayer.visible    : true,
       groupId:    _oldLayer ? _oldLayer.groupId    : null,
       speed:      _oldLayer ? _oldLayer.speed      : 40,
-      handSpeed:  _oldLayer ? _oldLayer.handSpeed  : 6,
+      handSpeed:  _oldLayer ? _oldLayer.handSpeed  : 18,
       chunks:     _oldLayer ? _oldLayer.chunks     : 30,
       specChunks: _oldLayer ? _oldLayer.specChunks : 35,
       hasPngAlpha: true,
@@ -9095,7 +9099,15 @@ document.getElementById('progress-track').addEventListener('click', seekAnim);
 
 // ─── HAND DRAWING ───
 function drawHand(c,tipX,tipY,dir,style) {
-  if (style === 'ghost') return;
+  if (style === 'ghost') { try { AudioEngine.scribble(false); } catch(e){} return; }
+
+  // ── Scribble sound: on while the hand tip is actually moving ──
+  try {
+    const lt = AudioEngine._lastTip;
+    const moved = lt ? (Math.abs(tipX - lt.x) + Math.abs(tipY - lt.y)) : 0;
+    AudioEngine._lastTip = { x: tipX, y: tipY };
+    AudioEngine.scribble(moved > 0.4);
+  } catch (e) {}
 
   // ── Smooth hand glide (toggleable — see "Smooth hand movement" switch) ──
   // At high hand-speed settings, the tick functions can jump the target tip
@@ -10513,7 +10525,7 @@ function applySlices() {
     colorStyle:         layer.colorStyle          || state.colorStyle,
     opacity:            layer.opacity             ?? 1,
     speed:              layer.speed               ?? 40,
-    handSpeed:          layer.handSpeed           ?? 6,
+    handSpeed:          layer.handSpeed           ?? 18,
   };
 
   const origIdx = state.layers.indexOf(layer);
@@ -11258,6 +11270,53 @@ const AudioEngine = {
     document.getElementById('voice-rec-btn').textContent = '⏺ Record';
   },
 
+  // ── Board writing (scribble) sound ──
+  scribbleEnabled: true,
+  _scribbleSrc: null,
+  _scribbleGain: null,
+  _lastTip: null,
+
+  initScribble() {
+    if (this._scribbleSrc) return;
+    const actx = this.ensureCtx();
+    const len = actx.sampleRate;                 // 1 second of noise
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const dta = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {              // brownish noise = soft marker friction
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      dta[i] = last * 3.2;
+    }
+    this._scribbleSrc = actx.createBufferSource();
+    this._scribbleSrc.buffer = buf;
+    this._scribbleSrc.loop = true;
+    const bp = actx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.7;
+    this._scribbleGain = actx.createGain();
+    this._scribbleGain.gain.value = 0;
+    this._scribbleSrc.connect(bp);
+    bp.connect(this._scribbleGain);
+    this._scribbleGain.connect(actx.destination);
+    this._scribbleSrc.start();
+  },
+
+  scribble(active) {
+    if (!this.scribbleEnabled) active = false;
+    if (active) {
+      this.initScribble();
+      if (this._scribbleGain) this._scribbleGain.gain.setTargetAtTime(0.09, this.actx.currentTime, 0.03);
+    } else if (this._scribbleGain && this.actx) {
+      this._scribbleGain.gain.setTargetAtTime(0, this.actx.currentTime, 0.05);
+    }
+  },
+
+  setScribbleEnabled(on) {
+    this.scribbleEnabled = !!on;
+    try { localStorage.setItem('ink_scribble', on ? '1' : '0'); } catch (e) {}
+    if (!on) this.scribble(false);
+  },
+
   // ── Playback (synced with animation) ──
   _previewStartedAt: null,
   _previewOffset: 0,
@@ -11294,8 +11353,21 @@ const AudioEngine = {
     }
     try { if (this._voiceSrc) { this._voiceSrc.stop(); this._voiceSrc = null; } } catch (e) {}
     try { if (this._musicSrc) { this._musicSrc.stop(); this._musicSrc = null; } } catch (e) {}
+    this.scribble(false);
+    this._lastTip = null;
   },
 };
+// Persisted scribble preference (default ON)
+try { AudioEngine.scribbleEnabled = localStorage.getItem('ink_scribble') !== '0'; } catch (e) {}
+function toggleScribble() {
+  AudioEngine.setScribbleEnabled(!AudioEngine.scribbleEnabled);
+  const el = document.getElementById('scribble-toggle');
+  if (el) el.classList.toggle('on', AudioEngine.scribbleEnabled);
+}
+try {
+  const st = document.getElementById('scribble-toggle');
+  if (st) st.classList.toggle('on', AudioEngine.scribbleEnabled);
+} catch (e) {}
 </script>
 </body>
 </html>
