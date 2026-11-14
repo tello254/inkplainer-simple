@@ -3424,7 +3424,7 @@ input[type="number"]:focus { border-color: var(--accent); }
   <!-- Hand movement style — global preference, applies to both Animation and Drawing tabs -->
   <div class="hand-glide-row">
     <span class="toggle-label">Smooth hand movement</span>
-    <button class="toggle on" id="hand-glide-toggle" onclick="toggleHandGlide()" title="Smooth: glides between positions. Off: matches the original snap-to-position movement."></button>
+    <button class="toggle" id="hand-glide-toggle" onclick="toggleHandGlide()" title="Smooth: glides between positions. Off: matches the original snap-to-position movement."></button>
   </div>
 
   <!-- ── Sticky Tab Switcher ── -->
@@ -3458,7 +3458,7 @@ input[type="number"]:focus { border-color: var(--accent); }
           <div class="anim-opt" data-anim="scanner"   onclick="selectAnim(this)">Scanner</div>
           <div class="anim-opt"         data-anim="contour"   onclick="selectAnim(this)">Contour</div>
           <div class="anim-opt"         data-anim="outlinechunks" onclick="selectAnim(this)">Outline Chunks</div>
-          <div class="anim-opt selected" data-anim="chunkjump" onclick="selectAnim(this)">Chunk Jump</div>
+          <div class="anim-opt" data-anim="chunkjump" onclick="selectAnim(this)">Chunk Jump</div>
         </div>
 
         <div id="scanner-opts" style="display:none">
@@ -3517,7 +3517,7 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
       <div class="card-body">
         <div class="anim-grid">
-          <div class="anim-opt" data-anim="outlinefill"  onclick="selectAnim(this)">Outline Fill</div>
+          <div class="anim-opt selected" data-anim="outlinefill"  onclick="selectAnim(this)">Outline Fill</div>
           <div class="anim-opt" data-anim="illustfill"   onclick="selectAnim(this)">Illust Fill</div>
           <div class="anim-opt" data-anim="outlineonly"  onclick="selectAnim(this)">Outline Only</div>
           <div class="anim-opt" data-anim="spec-text"    onclick="selectAnim(this)">✏ Text</div>
@@ -3568,9 +3568,9 @@ input[type="number"]:focus { border-color: var(--accent); }
             <div class="section-sublabel">Outline Detection</div>
             <div style="font-size:9px;color:var(--muted);margin-bottom:6px;line-height:1.4;">Strict = bold lines only &nbsp;·&nbsp; Fine = catches thin &amp; light strokes</div>
             <div class="slider-row">
-              <input type="range" id="outline-detect-slider" min="0" max="100" value="50"
+              <input type="range" id="outline-detect-slider" min="0" max="100" value="25"
                 oninput="updateSliderFill(this);document.getElementById('outline-detect-val').textContent=this.value;state.outlineDetect=+this.value;const l=getSelectedLayer();if(l)l.outlineDetect=+this.value;">
-              <span class="slider-val" id="outline-detect-val">50</span>
+              <span class="slider-val" id="outline-detect-val">25</span>
             </div>
             <div style="margin-top:8px;">
               <div class="section-sublabel" style="margin-bottom:5px;">Detection Algorithm</div>
@@ -3661,21 +3661,21 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px;">
           <div class="section-sublabel">Outline color</div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <input type="color" id="of-outline-color" value="#000000"
-              style="width:40px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0;">
+            <input type="color" id="of-outline-color" value="#000000" disabled
+              style="width:40px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0;opacity:0.4;">
             <span style="font-size:11px;color:var(--muted);">Pick a color or enable auto-detect below</span>
           </div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted-hi);">
-            <input type="checkbox" id="of-outline-autocolor" style="accent-color:#1a1a1a;width:14px;height:14px;"
+            <input type="checkbox" id="of-outline-autocolor" checked style="accent-color:#1a1a1a;width:14px;height:14px;"
               onchange="document.getElementById('of-outline-color').disabled=this.checked;document.getElementById('of-outline-color').style.opacity=this.checked?0.4:1;">
             <span>Auto-detect color from image</span>
           </label>
           <div style="border-top:1px solid var(--border);padding-top:8px;">
             <div class="section-sublabel">Outline thickness</div>
             <div class="slider-row">
-              <input type="range" id="of-outline-thickness" min="0.5" max="8" step="0.5" value="2"
+              <input type="range" id="of-outline-thickness" min="0.5" max="8" step="0.5" value="1"
                 oninput="updateSliderFill(this);document.getElementById('of-outline-thickness-val').textContent=this.value+'px'">
-              <span class="slider-val" id="of-outline-thickness-val">2px</span>
+              <span class="slider-val" id="of-outline-thickness-val">1px</span>
             </div>
           </div>
         </div>
@@ -3704,9 +3704,9 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div style="border-top:1px solid var(--border);padding-top:8px;">
           <div class="section-sublabel">Outline thickness</div>
           <div class="slider-row">
-            <input type="range" id="outlineonly-thickness" min="0.5" max="8" step="0.5" value="2"
+            <input type="range" id="outlineonly-thickness" min="0.5" max="8" step="0.5" value="1"
               oninput="updateSliderFill(this);document.getElementById('outlineonly-thickness-val').textContent=this.value+'px'">
-            <span class="slider-val" id="outlineonly-thickness-val">2px</span>
+            <span class="slider-val" id="outlineonly-thickness-val">1px</span>
           </div>
         </div>
         <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px;">
@@ -3776,9 +3776,9 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div style="border-top:1px solid var(--border);padding-top:8px;">
           <div class="section-sublabel">Outline thickness</div>
           <div class="slider-row">
-            <input type="range" id="text-outline-thickness" min="0.5" max="8" step="0.5" value="2"
+            <input type="range" id="text-outline-thickness" min="0.5" max="8" step="0.5" value="1"
               oninput="updateSliderFill(this);document.getElementById('text-outline-thickness-val').textContent=this.value+'px'">
-            <span class="slider-val" id="text-outline-thickness-val">2px</span>
+            <span class="slider-val" id="text-outline-thickness-val">1px</span>
           </div>
         </div>
       </div><!-- /text-outline-opts -->
@@ -4517,13 +4517,22 @@ function loadProject(projectId) {
       state.canvasBg = savedState.canvasBg || { type: 'solid', val: '#ffffff' };
       
       // Restore animation and drawing settings
-      state.animStyle = savedState.animStyle || 'chunkjump';
+      state.animStyle = savedState.animStyle || 'outlinefill';
       state.hand = savedState.hand || 'custom1';
       state.zigzag = savedState.zigzag !== undefined ? savedState.zigzag : true;
-      state.outlineDetect = savedState.outlineDetect !== undefined ? savedState.outlineDetect : 50;
+      state.outlineDetect = savedState.outlineDetect !== undefined ? savedState.outlineDetect : 25;
       state.outlineAlgorithm = savedState.outlineAlgorithm || 'classic';
       state.outlineStrokeStyle = savedState.outlineStrokeStyle || 'default';
       state.colorStyle = savedState.colorStyle || 'filled';
+      // Sync Drawing-tab option displays with restored/default state
+      try {
+        if (typeof syncDetectSlider === 'function') syncDetectSlider(state.outlineDetect);
+        if (typeof syncDetectAlgButtons === 'function') syncDetectAlgButtons(state.outlineAlgorithm);
+        if (typeof syncOutlineStrokeStyle === 'function') syncOutlineStrokeStyle(state.outlineStrokeStyle);
+        if (typeof syncColorStyle === 'function') syncColorStyle(state.colorStyle);
+        document.querySelectorAll('.anim-opt[data-anim]').forEach(el =>
+          el.classList.toggle('selected', el.dataset.anim === state.animStyle));
+      } catch (e) {}
       
       state.groups = savedState.groups || [];
       
@@ -4755,13 +4764,13 @@ async function createNewProject() {
     canvasBg: { type: 'solid', val: '#ffffff' },
     _currentRatio: '16:9',
     _currentRes: 720,
-    animStyle: 'chunkjump',
+    animStyle: 'outlinefill',
     hand: 'custom1',
     layers: [],
     selectedLayerId: null,
     groups: [],
     zigzag: true,
-    outlineDetect: 50,
+    outlineDetect: 25,
     outlineAlgorithm: 'classic',
     outlineStrokeStyle: 'default',
     colorStyle: 'filled'
@@ -5109,10 +5118,10 @@ function _applySnapshot(snap, label) {
   state.canvasW          = snap.canvasW || 1280;
   state.canvasH          = snap.canvasH || 720;
   state.canvasBg         = JSON.parse(JSON.stringify(snap.canvasBg || { type:'solid', val:'#ffffff' }));
-  state.animStyle        = snap.animStyle || 'chunkjump';
+  state.animStyle        = snap.animStyle || 'outlinefill';
   state.hand             = snap.hand || 'custom1';
   state.zigzag           = snap.zigzag !== undefined ? snap.zigzag : true;
-  state.outlineDetect    = snap.outlineDetect !== undefined ? snap.outlineDetect : 50;
+  state.outlineDetect    = snap.outlineDetect !== undefined ? snap.outlineDetect : 25;
   state.outlineAlgorithm = snap.outlineAlgorithm || 'classic';
   state.outlineStrokeStyle = snap.outlineStrokeStyle || 'default';
   state.colorStyle       = snap.colorStyle || 'filled';
@@ -5132,6 +5141,13 @@ function _applySnapshot(snap, label) {
     el.classList.toggle('selected', el.dataset.hand === state.hand));
   const zt = document.getElementById('zigzag-toggle');
   if (zt) { zt.classList.toggle('on', !!state.zigzag); zt.classList.toggle('off', !state.zigzag); }
+  // Sync Drawing-tab option displays (detection slider, algorithm, stroke, coloring)
+  try {
+    if (typeof syncDetectSlider === 'function') syncDetectSlider(state.outlineDetect ?? 25);
+    if (typeof syncDetectAlgButtons === 'function') syncDetectAlgButtons(state.outlineAlgorithm ?? 'classic');
+    if (typeof syncOutlineStrokeStyle === 'function') syncOutlineStrokeStyle(state.outlineStrokeStyle ?? 'default');
+    if (typeof syncColorStyle === 'function') syncColorStyle(state.colorStyle ?? 'filled');
+  } catch (e) {}
 
   const sizeText = `${state.canvasW} × ${state.canvasH}`;
   const tbSz = document.getElementById('topbar-size-display');
@@ -5691,7 +5707,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const state = {
   mode:'image',
   canvasBg: { type:'solid', val:'white' },   // {type:'solid'|'gradient'|'custom', val, key?}
-  color:'#1a1a1a', hand:'custom1', animStyle:'chunkjump', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:50, outlineAlgorithm:'classic', colorStyle:'filled',
+  color:'#1a1a1a', hand:'custom1', animStyle:'outlinefill', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:25, outlineAlgorithm:'classic', colorStyle:'filled',
   canvasW:1280, canvasH:720,
   playing:false, animFrame:null, done:false,
   // scanner
@@ -5719,7 +5735,7 @@ const state = {
   // ─── PRESETS ───
   activePresetId: null,  // id of last applied preset; cleared when any setting is changed manually
   // ─── HAND MOVEMENT STYLE (global user preference, not saved per-project) ───
-  handGlideEnabled: true,
+  handGlideEnabled: false,
 };
 
 // ─── CANVAS SETUP ───
@@ -6225,7 +6241,7 @@ function _runGroupAt(gpos) {
     slot._state.zigzag      = layer.zigzag    ?? state.zigzag;
     slot._state.textAnimDir  = layer.textAnimDir  || state.textAnimDir  || 'ltr';
     slot._state.textDrawStyle= layer.textDrawStyle|| state.textDrawStyle|| 'reveal';
-    slot._state.outlineDetect   = layer.outlineDetect   ?? state.outlineDetect   ?? 50;
+    slot._state.outlineDetect   = layer.outlineDetect   ?? state.outlineDetect   ?? 25;
     slot._state.outlineAlgorithm= layer.outlineAlgorithm|| state.outlineAlgorithm|| 'classic';
     slot._state.outlineStrokeStyle = layer.outlineStrokeStyle || state.outlineStrokeStyle || 'default';
     return slot;
@@ -7970,7 +7986,7 @@ function selectAnim(el) {
   // Sync detection slider value to selected layer (or global)
   if (_OUTLINE_ANIM_MODES.has(anim)) {
     const layer3 = getSelectedLayer();
-    syncDetectSlider((layer3?.outlineDetect ?? state.outlineDetect) ?? 50);
+    syncDetectSlider((layer3?.outlineDetect ?? state.outlineDetect) ?? 25);
     syncDetectAlgButtons((layer3?.outlineAlgorithm ?? state.outlineAlgorithm) ?? 'classic');
     syncOutlineStrokeStyle((layer3?.outlineStrokeStyle ?? state.outlineStrokeStyle) ?? 'default');
     syncColorStyle((layer3?.colorStyle ?? state.colorStyle) ?? 'filled');
@@ -8734,7 +8750,7 @@ function setupStyle() {
         const col = document.getElementById('outlineonly-color')?.value || '#000000';
         state.ifOutlineColor = col;
       }
-      state.ifOutlineThickness = parseFloat(document.getElementById('outlineonly-thickness')?.value ?? 2) * resScale();
+      state.ifOutlineThickness = parseFloat(document.getElementById('outlineonly-thickness')?.value ?? 1) * resScale();
       if (state.outlineAlgorithm && state.outlineAlgorithm !== 'classic') {
         // New algorithm takes priority over Color Region / Real Image checkboxes
         const lastPt2 = state.ifPerimPts?.length > 0 ? state.ifPerimPts[state.ifPerimPts.length-1] : null;
