@@ -3388,53 +3388,28 @@ input[type="number"]:focus { border-color: var(--accent); }
   </div>
   <div id="no-layer-hint">Select a layer on the right →<br>to edit its animation settings.</div>
 
-  <!-- CARD: Presets — sits above both tabs so it applies to Animation and Drawing -->
-  <div class="sidebar-section-label">Presets</div>
-  <div class="card collapsed">
-    <div class="card-header" onclick="toggleCard(this)">
-      <div class="card-header-label">Settings Presets</div>
-      <span class="card-chevron">▾</span>
-    </div>
-    <div class="card-body">
-
-      <!-- Built-in (locked) presets -->
-      <div class="preset-section-label">Built-in</div>
-      <div class="preset-grid" id="preset-builtin-grid">
-        <!-- Rendered by renderPresets() on load -->
-      </div>
-
-      <!-- Custom presets -->
-      <div class="preset-section-label">Custom</div>
-      <div class="preset-custom-list" id="preset-custom-list">
-        <!-- Rendered by renderPresets() on load -->
-      </div>
-      <!-- Save trigger & inline form -->
-      <button class="preset-save-trigger" id="preset-save-trigger" onclick="openPresetSaveForm()">+ Save current settings</button>
-      <div id="preset-save-form" style="display:none">
-        <div class="preset-save-row">
-          <input class="preset-save-input" id="preset-save-input" type="text" maxlength="28" placeholder="Preset name…"
-            onkeydown="if(event.key==='Enter')confirmSavePreset();if(event.key==='Escape')closePresetSaveForm()">
-          <button class="preset-save-confirm" onclick="confirmSavePreset()">Save</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Hand movement style — global preference, applies to both Animation and Drawing tabs -->
-  <div class="hand-glide-row">
+  <!-- Hand movement style — moved into the Settings dropdown below -->
+  <div class="hand-glide-row" style="display:none;">
     <span class="toggle-label">Smooth hand movement</span>
     <button class="toggle" id="hand-glide-toggle" onclick="toggleHandGlide()" title="Smooth: glides between positions. Off: matches the original snap-to-position movement."></button>
   </div>
 
-  <!-- ════ AUDIO: voiceover + background music ════ -->
-  <div class="sidebar-section-label">Audio</div>
+  <!-- ════ FILES: images / audio / video library ════ -->
+  <div class="sidebar-section-label">Files</div>
   <div class="card" id="card-audio">
     <div class="card-header" onclick="toggleCard(this)">
-      <div class="card-header-label">Voice &amp; Music</div>
+      <div class="card-header-label">Files</div>
       <span class="card-chevron">▾</span>
     </div>
     <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div class="section-sublabel">Images &amp; Video</div>
+        <button id="files-media-btn" onclick="document.getElementById('files-media-input').click()"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Add images / video</button>
+        <input type="file" id="files-media-input" accept="image/*,video/*" multiple style="display:none"
+          onchange="FilesLib.addMedia(this.files); this.value='';">
+        <div id="files-media-list" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
       <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
         <span class="section-sublabel" style="margin:0;">Board writing sound</span>
         <button class="toggle on" id="scribble-toggle" onclick="toggleScribble()" title="Marker-on-board sound while the hand draws"></button>
@@ -3474,22 +3449,41 @@ input[type="number"]:focus { border-color: var(--accent); }
     </div>
   </div>
 
-  <!-- ── Sticky Tab Switcher ── -->
-  <div class="sidebar-tabs">
-    <div class="sidebar-tab-row">
-      <button class="sidebar-tab-btn active" id="stab-animation" onclick="switchSidebarTab('animation')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polygon points="5,3 19,12 5,21"/></svg>
-        Animation
-      </button>
-      <button class="sidebar-tab-btn" id="stab-drawing" onclick="switchSidebarTab('drawing')">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-        Drawing
-      </button>
+  <!-- ════ SETTINGS: all settings in one dropdown ════ -->
+  <div class="sidebar-section-label">Settings</div>
+  <div class="card collapsed" id="card-settings">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-header-label">All Settings</div>
+      <span class="card-chevron">▾</span>
+    </div>
+    <div class="card-body" id="settings-body" style="display:none;flex-direction:column;gap:12px;">
+
+      <!-- Hand movement toggle moves here -->
+      <div id="settings-handglide-slot"></div>
+
+      <!-- Video Size moves here -->
+      <div id="settings-videosize-slot"></div>
+
+      <!-- Hand speed moves here -->
+      <div id="settings-speed-slot"></div>
+
+      <!-- Basic animation styles move here -->
+      <div id="settings-animstyle-slot"></div>
+
+      <!-- Drawing settings — hidden unless Drawing is clicked -->
+      <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="section-sublabel" style="margin:0;">Drawing settings</span>
+        <button class="toggle" id="drawing-settings-toggle" onclick="toggleDrawingSettings()" title="Show drawing style settings"></button>
+      </div>
+      <div id="drawing-settings-section" style="display:none;flex-direction:column;gap:12px;"></div>
+
     </div>
   </div>
 
-  <!-- ════ TAB: ANIMATION ════ -->
-  <div class="sidebar-tab-pane active" id="sidebar-pane-animation">
+  <!-- Animation/Drawing tab switcher removed — style is auto-chosen; Drawing settings live in the Settings card -->
+
+  <!-- ════ ANIMATION PANE (contents relocated into Settings card by reorganizeSidebar) ════ -->
+  <div class="sidebar-tab-pane active" id="sidebar-pane-animation" style="display:none;">
 
     <div class="sidebar-section-label">Animation</div>
 
@@ -3522,30 +3516,7 @@ input[type="number"]:focus { border-color: var(--accent); }
           </div>
         </div>
 
-        <div class="anim-section-divider">Specialized</div>
-        <div style="font-size:9px;color:var(--muted);margin-bottom:4px;line-height:1.4">Subject-aware drawing order.</div>
-        <div class="anim-grid anim-grid-3">
-          <div class="anim-opt" data-anim="spec-human"     onclick="selectAnim(this)">Human</div>
-          <div class="anim-opt" data-anim="spec-animal"    onclick="selectAnim(this)">Animal</div>
-          <div class="anim-opt" data-anim="spec-portrait"  onclick="selectAnim(this)">Portrait</div>
-          <div class="anim-opt" data-anim="spec-vehicle"   onclick="selectAnim(this)">Vehicle</div>
-          <div class="anim-opt" data-anim="spec-building"  onclick="selectAnim(this)">Building</div>
-          <div class="anim-opt" data-anim="spec-landscape" onclick="selectAnim(this)">Landscape</div>
-          <div class="anim-opt" data-anim="spec-spiral"    onclick="selectAnim(this)">Spiral</div>
-        </div>
-
-        <div id="spec-tile-opts" style="display:none">
-          <div class="section-sublabel">Chunks</div>
-          <div class="slider-row">
-            <input type="range" id="spec-tile-slider" min="6" max="80" value="35" oninput="updateSliderFill(this);document.getElementById('spec-tile-val').textContent=this.value">
-            <span class="slider-val" id="spec-tile-val">35</span>
-          </div>
-        </div>
-
-        <div id="spec-info">
-          <div id="spec-info-title"></div>
-          <div id="spec-info-desc"></div>
-        </div>
+        <!-- Specialized styles removed -->
       </div>
     </div>
 
@@ -3698,9 +3669,9 @@ input[type="number"]:focus { border-color: var(--accent); }
           <div style="display:flex;flex-direction:column;gap:3px;">
             <div class="section-sublabel">Opacity</div>
             <div class="slider-row">
-              <input type="range" id="outline-opacity" min="0" max="100" value="100"
+              <input type="range" id="outline-opacity" min="0" max="100" value="50"
                 oninput="updateSliderFill(this);setOutlineOpacity(this.value)">
-              <span class="slider-val" id="outline-opacity-val">100%</span>
+              <span class="slider-val" id="outline-opacity-val">50%</span>
             </div>
           </div>
         </div>
@@ -3871,6 +3842,17 @@ input[type="number"]:focus { border-color: var(--accent); }
   </div>
 
   <!-- Hidden hand/ratio/res elements so existing JS can find .hand-opt, .ratio-btn, .res-btn -->
+  <!-- Hidden dummies for removed Specialized UI (JS references stay safe) -->
+  <div style="display:none" aria-hidden="true">
+    <div id="spec-tile-opts">
+      <input type="range" id="spec-tile-slider" min="6" max="80" value="35">
+      <span id="spec-tile-val">35</span>
+    </div>
+    <div id="spec-info">
+      <div id="spec-info-title"></div>
+      <div id="spec-info-desc"></div>
+    </div>
+  </div>
   <div style="display:none" aria-hidden="true">
     <div class="hand-opt" data-hand="ghost"></div>
     <div class="hand-opt selected" data-hand="custom2"></div>
@@ -4007,7 +3989,7 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
       <canvas id="crop-canvas"></canvas>
       <span id="canvas-size-display" style="display:none">1280 × 720</span>
-      <span id="anim-style-label">Scanner</span>
+      <span id="anim-style-label" style="display:none;">Scanner</span>
       <span id="done-badge" class="done-badge">Done</span>
       <canvas id="outline-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;opacity:1;display:none;"></canvas>
     </div>
@@ -4036,6 +4018,41 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
       <span id="time-display">0%</span>
     </div>
+
+    <!-- ════════ WORKSPACE (cut timeline) ════════ -->
+    <style>
+      #workspace { position:absolute; left:0; right:0; bottom:0; height:74px; background:var(--bg);
+        border-top:1px solid var(--border); overflow:hidden; }
+      #workspace-strip { position:absolute; inset:6px 12px; overflow:hidden; }
+      #workspace-cuts { position:absolute; top:4px; bottom:4px; left:0; display:flex; gap:6px; transition:transform 0.08s linear; }
+      .ws-cut { min-width:86px; max-width:130px; height:100%; background:var(--panel); border:1px solid var(--border);
+        border-radius:8px; padding:6px 8px; cursor:pointer; flex-shrink:0; display:flex; flex-direction:column; gap:2px; }
+      .ws-cut:hover { border-color:var(--border-hi); }
+      .ws-cut.selected { border-color:var(--accent); background:var(--accent-lo); }
+      .ws-cut.drag-over { border-color:var(--accent2); }
+      .ws-cut-num { font-size:10px; font-weight:700; color:var(--accent); }
+      .ws-cut-name { font-size:10px; color:var(--muted-hi); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ws-empty { font-size:10px; color:var(--muted); padding:8px 4px; }
+      #workspace-playhead { position:absolute; top:2px; bottom:2px; left:20px; width:2px; background:var(--accent2); border-radius:2px; pointer-events:none; z-index:2; }
+    </style>
+    <div id="workspace">
+      <div id="workspace-strip">
+        <div id="workspace-playhead"></div>
+        <div id="workspace-cuts"></div>
+      </div>
+    </div>
+    <script>
+      // show workspace once it has content; keep playbar above it
+      (function () {
+        const ws = document.getElementById('workspace');
+        const pb = document.getElementById('playbar');
+        if (ws && pb) {
+          const sync = () => pb.style.bottom = ws.style.display === 'none' ? '' : '80px';
+          new MutationObserver(sync).observe(ws, { attributes: true, attributeFilter: ['style'] });
+          sync();
+        }
+      })();
+    </script>
   </div>
 
   <!-- ════════ BOTTOM BAR ════════ (hidden — hand, speed hardcoded; canvas size moved to sidebar. Elements kept for JS) -->
@@ -4628,6 +4645,7 @@ function loadProject(projectId) {
         const maxId = Math.max(...savedState.layers.map(l => l.id));
         if (maxId >= window._layerIdCounter) {
           window._layerIdCounter = maxId;
+          try { _layerIdCounter = maxId; } catch (e) {}
         }
         
         let loadedCount = 0;
@@ -5217,7 +5235,7 @@ function _applySnapshot(snap, label) {
 
   // Track max id to avoid counter conflicts
   const maxId = Math.max(...snap.layers.map(l => l.id));
-  if (maxId >= (window._layerIdCounter || 0)) window._layerIdCounter = maxId;
+  if (maxId >= (window._layerIdCounter || 0)) { window._layerIdCounter = maxId; try { _layerIdCounter = maxId; } catch (e) {} }
 
   let loaded = 0;
   const total = snap.layers.length;
@@ -5665,7 +5683,7 @@ window.addEventListener('load', () => {
       document.getElementById('scanner-opts').style.display         = isScanner        ? 'block' : 'none';
       document.getElementById('tile-opts').style.display            = isChunk          ? 'block' : 'none';
       document.getElementById('spec-tile-opts').style.display       = (isSpec && !isSpecText2) ? 'block' : 'none';
-      document.getElementById('card-illustopts').style.display      = isOutline2       ? 'block' : 'none';
+      document.getElementById('card-illustopts').style.display      = 'none'; // Fill Options removed per spec
       document.getElementById('card-outlineonlyopts').style.display = isOutlineOnly2   ? 'block' : 'none';
       document.getElementById('card-textopts').style.display        = isSpecText2      ? 'block' : 'none';
       const isOutlineMode2 = isOutline2 || isOutlineOnly2 || isSpecText2;
@@ -5976,11 +5994,12 @@ window.addEventListener('resize', fitCanvas);
 // ─────────────────────────────────────────────
 // ── LAYER MANAGEMENT
 // ─────────────────────────────────────────────
-let _layerIdCounter = 0;
+let _layerIdCounter = (typeof window !== 'undefined' && window._layerIdCounter) || 0;
 
 function addLayer(img, name) {
   pushUndoSnapshot();
   const id = ++_layerIdCounter;
+  try { window._layerIdCounter = _layerIdCounter; } catch (e) {}
   // Default size: fit within canvas keeping aspect ratio, at 80% of canvas
   const scale = Math.min(state.canvasW / img.width, state.canvasH / img.height) * 0.8;
   const w = Math.round(img.width * scale);
@@ -6113,7 +6132,7 @@ function syncSidebarToLayer(id) {
   document.getElementById('tile-opts').style.display            = isChunk       ? 'block' : 'none';
   document.getElementById('spec-tile-opts').style.display       = isSpec        ? 'block' : 'none';
   // BUG FIX: these cards were never synced when switching layers
-  document.getElementById('card-illustopts').style.display      = isOutline     ? 'block' : 'none';
+  document.getElementById('card-illustopts').style.display      = 'none'; // Fill Options removed per spec
   document.getElementById('card-outlineonlyopts').style.display = isOutlineOnly ? 'block' : 'none';
   const isDetectMode = isOutline || isOutlineOnly || anim === 'spec-text';
   document.getElementById('outline-detect-opts').style.display  = isDetectMode  ? 'block' : 'none';
@@ -6484,6 +6503,7 @@ function renderLayerList() {
   const count = document.getElementById('layer-count');
   count.textContent = `${state.layers.length} layer${state.layers.length!==1?'s':''}`;
   empty.style.display = state.layers.length ? 'none' : 'block';
+  try { Workspace.render(); FilesLib.render(); } catch (e) {}
 
   const reversed = [...state.layers].reverse();
   list.innerHTML = '';
@@ -7363,7 +7383,7 @@ function applyPreset(settings, presetId) {
   if (el_scanner)    el_scanner.style.display    = isScanner ? 'block' : 'none';
   if (el_tile)       el_tile.style.display       = (isChunk || isScribble || isOutlineChunks) ? 'block' : 'none';
   if (el_spec_tile)  el_spec_tile.style.display  = (isSpec && s.animStyle !== 'spec-text') ? 'block' : 'none';
-  if (el_illustopts) el_illustopts.style.display = isOutlineAnim ? 'block' : 'none';
+  if (el_illustopts) el_illustopts.style.display = 'none'; // Fill Options removed per spec
   if (el_outlineopts) el_outlineopts.style.display = (s.animStyle === 'outlineonly') ? 'block' : 'none';
   if (el_textopts)   el_textopts.style.display   = (s.animStyle === 'spec-text') ? 'block' : 'none';
   if (el_outlinedet) el_outlinedet.style.display = isDrawingAnim ? 'block' : 'none';
@@ -8047,7 +8067,7 @@ function selectAnim(el) {
   document.getElementById('tile-opts').style.display      = (isChunk||isScribble||isOutlineChunks) ? 'block' : 'none';
   document.getElementById('spec-tile-opts').style.display = (isSpec && anim !== 'spec-text') ? 'block' : 'none';
   const isOutlineAnim = anim==='illustfill' || anim==='outlinefill';
-  document.getElementById('card-illustopts').style.display= isOutlineAnim ? 'block' : 'none';
+  document.getElementById('card-illustopts').style.display= 'none'; // Fill Options removed per spec
   document.getElementById('card-outlineonlyopts').style.display= (anim==='outlineonly') ? 'block' : 'none';
   document.getElementById('card-textopts').style.display        = (anim==='spec-text')  ? 'block' : 'none';
   document.getElementById('outline-detect-opts').style.display  = _OUTLINE_ANIM_MODES.has(anim) ? 'block' : 'none';
@@ -8607,6 +8627,7 @@ function _commitTextLayer(text) {
     }
 
     const id = ++_layerIdCounter;
+    try { window._layerIdCounter = _layerIdCounter; } catch (e) {}
     const layer = {
       id,
       name: text.split('\n')[0].slice(0, 24) || 'Text',
@@ -8858,6 +8879,7 @@ function setProgress(ratio) {
   const pct=Math.round(state._animProgress*100);
   document.getElementById('progress-fill').style.width=pct+'%';
   document.getElementById('time-display').textContent=pct+'%';
+  try { Workspace.setPlayhead(Math.min(ratio, 1)); } catch (e) {}
 }
 
 function animate() {
@@ -11381,6 +11403,158 @@ try {
   const st = document.getElementById('scribble-toggle');
   if (st) st.classList.toggle('on', AudioEngine.scribbleEnabled);
 } catch (e) {}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FILES LIBRARY — images/audio/video, images numbered by workspace order
+// ═══════════════════════════════════════════════════════════════════════════
+const FilesLib = {
+  media: [],   // non-image files (audio/video) stored as library entries
+
+  async addMedia(fileList) {
+    for (const f of fileList) {
+      if (f.type.startsWith('image/')) {
+        loadImageFile(f);                    // adds as a workspace layer (auto-classified)
+      } else if (f.type.startsWith('audio/')) {
+        this.media.push({ name: f.name, type: 'audio', size: f.size });
+      } else if (f.type.startsWith('video/')) {
+        this.media.push({ name: f.name, type: 'video', size: f.size });
+      }
+    }
+    this.render();
+    setTimeout(() => { this.render(); Workspace.render(); }, 600);  // after layers load async
+  },
+
+  render() {
+    const list = document.getElementById('files-media-list');
+    if (!list) return;
+    const items = [];
+    // numbered image layers (workspace order)
+    const seq = Workspace.orderSeq();
+    seq.forEach((l, i) => {
+      items.push(`<div class="files-item" data-layer="${l.id}" onclick="selectLayer(${l.id})"
+        style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:var(--panel);">
+        <span style="font-weight:700;color:var(--accent);min-width:16px;">${i + 1}</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🖼 ${l.name}</span>
+        <button onclick="event.stopPropagation();removeLayer(${l.id});FilesLib.render();Workspace.render();"
+          style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
+      </div>`);
+    });
+    // library entries (audio/video)
+    this.media.forEach((m, i) => {
+      items.push(`<div class="files-item" style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">
+        <span style="font-weight:700;color:var(--muted);min-width:16px;">♪</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.type === 'video' ? '🎬' : '🔊'} ${m.name}</span>
+        <button onclick="event.stopPropagation();FilesLib.media.splice(${i},1);FilesLib.render();"
+          style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
+      </div>`);
+    });
+    list.innerHTML = items.join('') || '<div style="font-size:10px;color:var(--muted);">No files yet — add images to build your video.</div>';
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WORKSPACE — CapCut-style cut timeline (v1)
+// ═══════════════════════════════════════════════════════════════════════════
+const Workspace = {
+  dragId: null,
+
+  orderSeq() {
+    const withOrder = state.layers.filter(l => l.animOrder != null).sort((a, b) => a.animOrder - b.animOrder);
+    const rest = state.layers.filter(l => l.animOrder == null);
+    return [...withOrder, ...rest];
+  },
+
+  render() {
+    const cuts = document.getElementById('workspace-cuts');
+    if (!cuts) return;
+    const seq = this.orderSeq();
+    cuts.innerHTML = seq.map((l, i) => `
+      <div class="ws-cut${state.selectedLayerId === l.id ? ' selected' : ''}" draggable="true"
+        data-id="${l.id}" onclick="selectLayer(${l.id})">
+        <div class="ws-cut-num">${i + 1}</div>
+        <div class="ws-cut-name">${l.name}</div>
+      </div>`).join('') || '<div class="ws-empty">Your cuts appear here — add images in Files</div>';
+    [...cuts.querySelectorAll('.ws-cut')].forEach(el => {
+      el.addEventListener('dragstart', e => { this.dragId = +el.dataset.id; e.dataTransfer.effectAllowed = 'move'; });
+      el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+      el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag-over'); this.reorder(this.dragId, +el.dataset.id); });
+      el.addEventListener('dragend', () => el.classList.remove('drag-over'));
+    });
+  },
+
+  reorder(dragId, targetId) {
+    if (!dragId || dragId === targetId) return;
+    pushUndoSnapshot();
+    const seq = this.orderSeq();
+    const from = seq.findIndex(l => l.id === dragId);
+    const to = seq.findIndex(l => l.id === targetId);
+    if (from < 0 || to < 0) return;
+    const [moved] = seq.splice(from, 1);
+    seq.splice(to, 0, moved);
+    // assign explicit order 1..n and reorder the stack to match
+    seq.forEach((l, i) => { l.animOrder = i + 1; });
+    state.layers = [...seq];
+    this.render(); FilesLib.render(); renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave();
+  },
+
+  setPlayhead(ratio) {
+    const strip = document.getElementById('workspace-strip');
+    const ph = document.getElementById('workspace-playhead');
+    const cuts = document.getElementById('workspace-cuts');
+    if (!strip || !ph || !cuts) return;
+    const w = strip.clientWidth;
+    const x = Math.max(0, Math.min(1, ratio)) * (w - 40) + 20;
+    ph.style.left = x + 'px';
+    cuts.style.transform = `translateX(${Math.min(0, 60 - x)}px)`;
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS REORGANIZER — relocates existing panels into the Settings card
+// ═══════════════════════════════════════════════════════════════════════════
+function toggleDrawingSettings() {
+  const sec = document.getElementById('drawing-settings-section');
+  const btn = document.getElementById('drawing-settings-toggle');
+  const show = sec.style.display === 'none';
+  sec.style.display = show ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('on', show);
+}
+
+function reorganizeSidebar() {
+  const $ = id => document.getElementById(id);
+  const slotHG = $('settings-handglide-slot');
+  const slotVS = $('settings-videosize-slot');
+  const slotSP = $('settings-speed-slot');
+  const slotAS = $('settings-animstyle-slot');
+  const slotDW = $('drawing-settings-section');
+  if (!slotAS || slotAS.dataset.done) return;
+  slotAS.dataset.done = '1';
+
+  // 1. Smooth hand movement row
+  const hg = document.querySelector('.hand-glide-row');
+  if (hg) { hg.style.display = 'flex'; slotHG.appendChild(hg); }
+
+  // 2. Video Size block (the sidebar-actions div containing the Video Size label)
+  const vsBlock = [...document.querySelectorAll('.sidebar-actions')].find(el => el.textContent.includes('Video Size'));
+  if (vsBlock) { vsBlock.style.borderTop = 'none'; vsBlock.style.paddingBottom = '0'; slotVS.appendChild(vsBlock); }
+
+  // 3. Speed section (from hidden bottom bar) — reveal stays visible next to hand speed
+  const speedSection = [...document.querySelectorAll('#bottom-bar .bb-section')].find(el => el.querySelector('#hand-speed-slider'));
+  if (speedSection) { speedSection.style.display = ''; slotSP.appendChild(speedSection); }
+
+  // 4. Animation Style card (basic styles only now)
+  const animCard = document.querySelector('#sidebar-pane-animation .card');
+  if (animCard) slotAS.appendChild(animCard);
+
+  // 5. Drawing pane cards → hidden drawing section inside Settings
+  const pane = $('sidebar-pane-drawing');
+  if (pane) {
+    [...pane.querySelectorAll(':scope > .card')].forEach(c => slotDW.appendChild(c));
+    pane.style.display = 'none';
+  }
+}
+try { reorganizeSidebar(); } catch (e) {}
 </script>
 </body>
 </html>
