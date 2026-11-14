@@ -3835,6 +3835,36 @@ input[type="number"]:focus { border-color: var(--accent); }
 
   </div><!-- /sidebar-pane-drawing -->
 
+  <!-- Canvas Size — choose orientation + resolution right before generating -->
+  <div class="sidebar-actions" style="border-top:1px solid var(--border);padding-bottom:6px;">
+    <div class="bb-label" style="margin:8px 0 6px;">Video Size</div>
+    <div class="bb-size-group" style="display:flex;gap:10px;">
+      <div class="bb-size-block" style="flex:1;">
+        <div class="bb-size-subtitle">Orientation</div>
+        <div class="bb-size-row">
+          <div class="bb-ratio-btn active" data-ratio="16:9" onclick="bbSelectRatio(this)">
+            <div class="bb-ratio-thumb" style="width:14px;height:8px;"></div> 16:9
+          </div>
+          <div class="bb-ratio-btn" data-ratio="9:16" onclick="bbSelectRatio(this)">
+            <div class="bb-ratio-thumb" style="width:7px;height:12px;"></div> 9:16
+          </div>
+          <div class="bb-ratio-btn" data-ratio="1:1" onclick="bbSelectRatio(this)">
+            <div class="bb-ratio-thumb" style="width:10px;height:10px;"></div> 1:1
+          </div>
+        </div>
+      </div>
+      <div class="bb-size-block" style="flex:1;">
+        <div class="bb-size-subtitle">Resolution</div>
+        <div class="bb-size-row">
+          <div class="bb-res-btn active" data-res="720"  onclick="bbSelectRes(this)">720p</div>
+          <div class="bb-res-btn"        data-res="1080" onclick="bbSelectRes(this)">1080p</div>
+          <div class="bb-res-btn"        data-res="1440" onclick="bbSelectRes(this)">1440p</div>
+        </div>
+        <div class="bb-size-readout" id="bb-size-readout">1280 × 720</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Generate — sticky at bottom, outside panes -->
   <div class="sidebar-actions">
     <button id="btn-generate" onclick="generate()">▶ Generate Animation</button>
@@ -3843,7 +3873,7 @@ input[type="number"]:focus { border-color: var(--accent); }
   <!-- Hidden hand/ratio/res elements so existing JS can find .hand-opt, .ratio-btn, .res-btn -->
   <div style="display:none" aria-hidden="true">
     <div class="hand-opt" data-hand="ghost"></div>
-    <div class="hand-opt selected" data-hand="custom1"></div>
+    <div class="hand-opt selected" data-hand="custom2"></div>
     <div class="hand-opt" data-hand="custom2"></div>
     <div class="hand-opt" data-hand="custom3"></div>
     <div class="hand-opt" data-hand="custom4"></div>
@@ -4008,16 +4038,16 @@ input[type="number"]:focus { border-color: var(--accent); }
     </div>
   </div>
 
-  <!-- ════════ BOTTOM BAR ════════ -->
-  <div id="bottom-bar">
+  <!-- ════════ BOTTOM BAR ════════ (hidden — hand, speed hardcoded; canvas size moved to sidebar. Elements kept for JS) -->
+  <div id="bottom-bar" style="display:none;">
 
-    <!-- Hand Style -->
-    <div class="bb-section" style="flex:2;min-width:0;">
+    <!-- Hand Style — hidden: hardcoded to Hand 2 -->
+    <div class="bb-section" style="display:none;">
       <div class="bb-label">Hand Style</div>
       <div class="bb-hand-row">
         <div class="bb-hand-pill"          data-hand="ghost"  onclick="bbSelectHand(this)">Ghost</div>
-        <div class="bb-hand-pill selected" data-hand="custom1" onclick="bbSelectHand(this)">Hand 1</div>
-        <div class="bb-hand-pill"          data-hand="custom2" onclick="bbSelectHand(this)">Hand 2</div>
+        <div class="bb-hand-pill"          data-hand="custom1" onclick="bbSelectHand(this)">Hand 1</div>
+        <div class="bb-hand-pill selected" data-hand="custom2" onclick="bbSelectHand(this)">Hand 2</div>
         <div class="bb-hand-pill"          data-hand="custom3" onclick="bbSelectHand(this)">Hand 3</div>
         <div class="bb-hand-pill"          data-hand="custom4" onclick="bbSelectHand(this)">Pen</div>
         <div class="bb-hand-pill"          data-hand="custom5" onclick="bbSelectHand(this)">Cartoon</div>
@@ -4025,8 +4055,8 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
     </div>
 
-    <!-- Speed -->
-    <div class="bb-section" style="flex:2;min-width:0;">
+    <!-- Speed — hidden: hardcoded (Reveal 40, Hand 18) -->
+    <div class="bb-section" style="display:none;">
       <div class="bb-label">Speed</div>
       <div class="bb-sliders">
         <div class="bb-slider-row">
@@ -4044,35 +4074,7 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
     </div>
 
-    <!-- Canvas Size -->
-    <div class="bb-section" style="flex:2;min-width:0;">
-      <div class="bb-label" style="margin-bottom:0;">Canvas Size</div>
-      <div class="bb-size-group">
-        <div class="bb-size-block">
-          <div class="bb-size-subtitle">Aspect Ratio</div>
-          <div class="bb-size-row">
-            <div class="bb-ratio-btn active" data-ratio="16:9" onclick="bbSelectRatio(this)">
-              <div class="bb-ratio-thumb" style="width:14px;height:8px;"></div> 16:9
-            </div>
-            <div class="bb-ratio-btn" data-ratio="9:16" onclick="bbSelectRatio(this)">
-              <div class="bb-ratio-thumb" style="width:7px;height:12px;"></div> 9:16
-            </div>
-            <div class="bb-ratio-btn" data-ratio="1:1" onclick="bbSelectRatio(this)">
-              <div class="bb-ratio-thumb" style="width:10px;height:10px;"></div> 1:1
-            </div>
-          </div>
-        </div>
-        <div class="bb-size-block">
-          <div class="bb-size-subtitle">Resolution</div>
-          <div class="bb-size-row">
-            <div class="bb-res-btn active" data-res="720"  onclick="bbSelectRes(this)">720p</div>
-            <div class="bb-res-btn"        data-res="1080" onclick="bbSelectRes(this)">1080p</div>
-            <div class="bb-res-btn"        data-res="1440" onclick="bbSelectRes(this)">1440p</div>
-          </div>
-          <div class="bb-size-readout" id="bb-size-readout">1280 × 720</div>
-        </div>
-      </div>
-    </div>
+    <!-- Canvas Size — moved into the left sidebar above Generate -->
 
   </div><!-- /bottom-bar -->
 </div><!-- /main -->
@@ -4565,7 +4567,7 @@ function loadProject(projectId) {
       
       // Restore animation and drawing settings
       state.animStyle = savedState.animStyle || 'chunkjump';
-      state.hand = savedState.hand || 'custom1';
+      state.hand = savedState.hand || 'custom2';
       state.zigzag = savedState.zigzag !== undefined ? savedState.zigzag : true;
       state.outlineDetect = savedState.outlineDetect !== undefined ? savedState.outlineDetect : 25;
       state.outlineAlgorithm = savedState.outlineAlgorithm || 'classic';
@@ -4648,7 +4650,7 @@ function loadProject(projectId) {
                 baseH: layerData.baseH !== undefined ? layerData.baseH : layerData.h,
                 resizePct: layerData.resizePct !== undefined ? layerData.resizePct : 100,
                 animStyle: layerData.animStyle || 'scanner',
-                hand: layerData.hand || 'custom1',
+                hand: layerData.hand || 'custom2',
                 animOrder: layerData.animOrder !== undefined ? layerData.animOrder : null,
                 opacity: layerData.opacity !== undefined ? layerData.opacity : 1,
                 visible: layerData.visible !== undefined ? layerData.visible : true,
@@ -4812,7 +4814,7 @@ async function createNewProject() {
     _currentRatio: '16:9',
     _currentRes: 720,
     animStyle: 'chunkjump',
-    hand: 'custom1',
+    hand: 'custom2',
     layers: [],
     selectedLayerId: null,
     groups: [],
@@ -5166,7 +5168,7 @@ function _applySnapshot(snap, label) {
   state.canvasH          = snap.canvasH || 720;
   state.canvasBg         = JSON.parse(JSON.stringify(snap.canvasBg || { type:'solid', val:'#ffffff' }));
   state.animStyle        = snap.animStyle || 'chunkjump';
-  state.hand             = snap.hand || 'custom1';
+  state.hand             = snap.hand || 'custom2';
   state.zigzag           = snap.zigzag !== undefined ? snap.zigzag : true;
   state.outlineDetect    = snap.outlineDetect !== undefined ? snap.outlineDetect : 25;
   state.outlineAlgorithm = snap.outlineAlgorithm || 'classic';
@@ -5241,7 +5243,7 @@ function _applySnapshot(snap, label) {
           baseH: ld.baseH !== undefined ? ld.baseH : ld.h,
           resizePct: ld.resizePct !== undefined ? ld.resizePct : 100,
           animStyle: ld.animStyle || 'scanner',
-          hand: ld.hand || 'custom1',
+          hand: ld.hand || 'custom2',
           animOrder: ld.animOrder !== undefined ? ld.animOrder : idx + 1,
           opacity: ld.opacity !== undefined ? ld.opacity : 1,
           visible: ld.visible !== undefined ? ld.visible : true,
@@ -5754,7 +5756,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const state = {
   mode:'image',
   canvasBg: { type:'solid', val:'white' },   // {type:'solid'|'gradient'|'custom', val, key?}
-  color:'#1a1a1a', hand:'custom1', animStyle:'chunkjump', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:25, outlineAlgorithm:'classic', colorStyle:'filled',
+  color:'#1a1a1a', hand:'custom2', animStyle:'chunkjump', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:25, outlineAlgorithm:'classic', colorStyle:'filled',
   canvasW:1280, canvasH:720,
   playing:false, animFrame:null, done:false,
   // scanner
@@ -6002,7 +6004,7 @@ function addLayer(img, name) {
     baseH: h,
     resizePct: 100,
     animStyle: 'chunkjump',  // auto-classified below (colored → chunkjump, sketch → outlinefill)
-    hand: state.hand || 'custom1',
+    hand: state.hand || 'custom2',
     animOrder: null,  // null = follow visual stack order (state.layers index); user can set manually
     opacity: 1,
     visible: true,
@@ -7316,7 +7318,7 @@ const BUILT_IN_PRESETS = [
 function captureCurrentSettings() {
   return {
     animStyle:          state.animStyle          || 'scanner',
-    hand:               state.hand               || 'custom1',
+    hand:               state.hand               || 'custom2',
     zigzag:             state.zigzag             ?? true,
     speed:              +(document.getElementById('speed-slider')?.value      ?? 40),
     handSpeed:          +(document.getElementById('hand-speed-slider')?.value ?? 18),
@@ -8617,7 +8619,7 @@ function _commitTextLayer(text) {
       baseH: Math.ceil(totalH),
       resizePct: 100,
       animStyle:  _oldLayer ? _oldLayer.animStyle  : (state.animStyle || 'spec-text'),
-      hand:       _oldLayer ? _oldLayer.hand       : (state.hand || 'custom1'),
+      hand:       _oldLayer ? _oldLayer.hand       : (state.hand || 'custom2'),
       animOrder:  _oldLayer ? _oldLayer.animOrder  : null,
       opacity:    _oldLayer ? _oldLayer.opacity    : 1,
       visible:    _oldLayer ? _oldLayer.visible    : true,
@@ -11237,10 +11239,21 @@ const AudioEngine = {
   // ── Recording ──
   async toggleRecord() {
     if (this.recording) { this._stopRecord(); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast('Recording not supported in this browser — use Chrome or Edge');
+      return;
+    }
+    let stream;
     try {
-      this._recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
-      showToast('Microphone permission denied');
+      const msg =
+        e.name === 'NotAllowedError' ? 'Microphone blocked — click the 🔒 icon in the address bar, set Microphone to Allow, then try again' :
+        e.name === 'NotFoundError'   ? 'No microphone found — connect one and try again' :
+        e.name === 'NotReadableError'? 'Microphone is in use by another app — close it and try again' :
+                                       'Could not access microphone (' + e.name + ')';
+      showToast(msg);
+      document.getElementById('voice-status').textContent = '⚠ ' + msg;
       return;
     }
     this._recChunks = [];
