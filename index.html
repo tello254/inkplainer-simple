@@ -3427,6 +3427,49 @@ input[type="number"]:focus { border-color: var(--accent); }
     <button class="toggle" id="hand-glide-toggle" onclick="toggleHandGlide()" title="Smooth: glides between positions. Off: matches the original snap-to-position movement."></button>
   </div>
 
+  <!-- ════ AUDIO: voiceover + background music ════ -->
+  <div class="sidebar-section-label">Audio</div>
+  <div class="card" id="card-audio">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-header-label">Voice &amp; Music</div>
+      <span class="card-chevron">▾</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <div class="section-sublabel">Voiceover</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <button id="voice-file-btn" onclick="document.getElementById('voice-file-input').click()"
+            style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload</button>
+          <button id="voice-rec-btn" onclick="AudioEngine.toggleRecord()"
+            style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">⏺ Record</button>
+          <button onclick="AudioEngine.clearVoice()" title="Remove voiceover"
+            style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">✕</button>
+        </div>
+        <input type="file" id="voice-file-input" accept="audio/*" style="display:none" onchange="AudioEngine.loadVoiceFile(this.files[0]); this.value='';">
+        <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">No voiceover — upload or record one</div>
+      </div>
+      <div>
+        <div class="section-sublabel">Background music</div>
+        <button id="music-file-btn" onclick="document.getElementById('music-file-input').click()"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload music</button>
+        <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="AudioEngine.loadMusicFile(this.files[0]); this.value='';">
+        <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">No music — upload an audio file</div>
+      </div>
+      <div>
+        <div class="section-sublabel" style="display:flex;justify-content:space-between;">
+          <span>Music volume</span><span class="slider-val" id="music-vol-val">15%</span>
+        </div>
+        <div class="slider-row">
+          <input type="range" id="music-vol" min="0" max="100" value="15"
+            oninput="updateSliderFill(this);AudioEngine.setMusicVolume(this.value);">
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);line-height:1.4;">
+        Audio plays in sync when you play the animation. It is included in MP4 export (Chrome/Edge).
+      </div>
+    </div>
+  </div>
+
   <!-- ── Sticky Tab Switcher ── -->
   <div class="sidebar-tabs">
     <div class="sidebar-tab-row">
@@ -3470,8 +3513,8 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div id="tile-opts" style="display:none">
           <div class="section-sublabel">Chunks <span style="font-size:9px;color:var(--muted)">(more = finer)</span></div>
           <div class="slider-row">
-            <input type="range" id="tile-slider" min="6" max="80" value="30" oninput="updateSliderFill(this);document.getElementById('tile-val').textContent=this.value">
-            <span class="slider-val" id="tile-val">30</span>
+            <input type="range" id="tile-slider" min="6" max="80" value="68" oninput="updateSliderFill(this);document.getElementById('tile-val').textContent=this.value">
+            <span class="slider-val" id="tile-val">68</span>
           </div>
         </div>
 
@@ -4517,7 +4560,7 @@ function loadProject(projectId) {
       state.canvasBg = savedState.canvasBg || { type: 'solid', val: '#ffffff' };
       
       // Restore animation and drawing settings
-      state.animStyle = savedState.animStyle || 'outlinefill';
+      state.animStyle = savedState.animStyle || 'chunkjump';
       state.hand = savedState.hand || 'custom1';
       state.zigzag = savedState.zigzag !== undefined ? savedState.zigzag : true;
       state.outlineDetect = savedState.outlineDetect !== undefined ? savedState.outlineDetect : 25;
@@ -4764,7 +4807,7 @@ async function createNewProject() {
     canvasBg: { type: 'solid', val: '#ffffff' },
     _currentRatio: '16:9',
     _currentRes: 720,
-    animStyle: 'outlinefill',
+    animStyle: 'chunkjump',
     hand: 'custom1',
     layers: [],
     selectedLayerId: null,
@@ -5118,7 +5161,7 @@ function _applySnapshot(snap, label) {
   state.canvasW          = snap.canvasW || 1280;
   state.canvasH          = snap.canvasH || 720;
   state.canvasBg         = JSON.parse(JSON.stringify(snap.canvasBg || { type:'solid', val:'#ffffff' }));
-  state.animStyle        = snap.animStyle || 'outlinefill';
+  state.animStyle        = snap.animStyle || 'chunkjump';
   state.hand             = snap.hand || 'custom1';
   state.zigzag           = snap.zigzag !== undefined ? snap.zigzag : true;
   state.outlineDetect    = snap.outlineDetect !== undefined ? snap.outlineDetect : 25;
@@ -5707,7 +5750,7 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
 const state = {
   mode:'image',
   canvasBg: { type:'solid', val:'white' },   // {type:'solid'|'gradient'|'custom', val, key?}
-  color:'#1a1a1a', hand:'custom1', animStyle:'outlinefill', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:25, outlineAlgorithm:'classic', colorStyle:'filled',
+  color:'#1a1a1a', hand:'custom1', animStyle:'chunkjump', zigzag:true, textAnimDir:'ltr', textDrawStyle:'reveal', outlineDetect:25, outlineAlgorithm:'classic', colorStyle:'filled',
   canvasW:1280, canvasH:720,
   playing:false, animFrame:null, done:false,
   // scanner
@@ -5954,7 +5997,7 @@ function addLayer(img, name) {
     baseW: w,
     baseH: h,
     resizePct: 100,
-    animStyle: state.animStyle || 'scanner',  // inherit current global style, never null
+    animStyle: 'chunkjump',  // auto-classified below (colored → chunkjump, sketch → outlinefill)
     hand: state.hand || 'custom1',
     animOrder: null,  // null = follow visual stack order (state.layers index); user can set manually
     opacity: 1,
@@ -5962,9 +6005,28 @@ function addLayer(img, name) {
     groupId: null,
     speed: 40,
     handSpeed: 6,
-    chunks: 30,
+    chunks: 68,
     specChunks: 35,
     hasPngAlpha };
+  // ── Auto-classify: colorful image → Chunk Jump @68; sketch/line art → Outline Fill ──
+  try {
+    let colored = 0, sampled = 0;
+    for (let i = 0; i < d.length; i += 16) {          // sample every 4th pixel
+      const a = d[i+3];
+      if (a < 24) continue;                            // ignore transparent
+      sampled++;
+      const r = d[i], g = d[i+1], b = d[i+2];
+      const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+      if (mx - mn > 42) colored++;                     // noticeably chromatic pixel
+    }
+    const coloredFrac = sampled ? colored / sampled : 0;
+    if (coloredFrac > 0.12) {
+      layer.animStyle = 'chunkjump';
+      layer.chunks = 68;
+    } else {
+      layer.animStyle = 'outlinefill';                 // monochrome sketch → Drawing tab style
+    }
+  } catch (e) {}
   state.layers.push(layer);
   
   // Ensure canvas is properly fitted after adding layer
@@ -8870,17 +8932,19 @@ function restartAnim() {
   resetAnim(); setupStyle(); startAnim();
 }
 
-function startAnim()  { state.playing=true; updatePlayIcons(); animate(); }
+function startAnim()  { state.playing=true; updatePlayIcons(); AudioEngine.resumePreview(); animate(); }
 
 function togglePlay() {
   if (state.done) { restartAnim(); return; }
   state.playing=!state.playing; updatePlayIcons();
-  if (state.playing) animate();
+  if (state.playing) { AudioEngine.resumePreview(); animate(); }
+  else AudioEngine.stopPreview();
 }
 
 function updatePlayIcons() {
   document.getElementById('play-icon').style.display  = state.playing?'none':'block';
   document.getElementById('pause-icon').style.display = state.playing?'block':'none';
+  if (state.done) { try { AudioEngine.stopPreview(); } catch (e) {} }
 }
 
 function finishAnim() {
@@ -11075,6 +11139,163 @@ function obEnd() {
     }, 600);
   }
 })();
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIO ENGINE — voiceover + background music, mixed live with animation
+// ═══════════════════════════════════════════════════════════════════════════
+const AudioEngine = {
+  actx: null,
+  voiceBuf: null,
+  musicBuf: null,
+  musicGain: null,
+  voiceGain: null,
+  _voiceSrc: null,
+  _musicSrc: null,
+  recording: false,
+  _mediaRec: null,
+  _recChunks: [],
+  _recStream: null,
+
+  ensureCtx() {
+    if (!this.actx) {
+      this.actx = new (window.AudioContext || window.webkitAudioContext)();
+      this.voiceGain = this.actx.createGain();
+      this.musicGain = this.actx.createGain();
+      this.voiceGain.connect(this.actx.destination);
+      this.musicGain.connect(this.actx.destination);
+      this.setMusicVolume(document.getElementById('music-vol')?.value ?? 15);    }
+    if (this.actx.state === 'suspended') this.actx.resume();
+    return this.actx;
+  },
+
+  async _decode(file) {
+    const ab = await file.arrayBuffer();
+    return await this.ensureCtx().decodeAudioData(ab.slice(0));
+  },
+
+  _fmtDur(s) {
+    const m = Math.floor(s / 60), sec = Math.round(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  },
+
+  async loadVoiceFile(file) {
+    if (!file) return;
+    try {
+      this.voiceBuf = await this._decode(file);
+      document.getElementById('voice-status').textContent =
+        `✅ Voiceover loaded (${this._fmtDur(this.voiceBuf.duration)})`;
+      showToast('Voiceover loaded');
+    } catch (e) {
+      document.getElementById('voice-status').textContent = '⚠ Could not decode that audio file';
+    }
+  },
+
+  async loadMusicFile(file) {
+    if (!file) return;
+    try {
+      this.musicBuf = await this._decode(file);
+      document.getElementById('music-status').textContent =
+        `✅ Music loaded (${this._fmtDur(this.musicBuf.duration)})`;
+      showToast('Music loaded');
+    } catch (e) {
+      document.getElementById('music-status').textContent = '⚠ Could not decode that audio file';
+    }
+  },
+
+  clearVoice() {
+    this.voiceBuf = null;
+    document.getElementById('voice-status').textContent = 'No voiceover — upload or record one';
+  },
+
+  clearMusic() {
+    this.musicBuf = null;
+    document.getElementById('music-status').textContent = 'No music — upload an audio file';
+  },
+
+  setMusicVolume(v) {
+    v = +v;
+    const el = document.getElementById('music-vol-val');
+    if (el) el.textContent = v + '%';
+    this._musicVol = (v / 100) * 0.9;                       // remembered even before context exists
+    if (this.musicGain) this.musicGain.gain.value = this._musicVol;
+  },
+
+  // ── Recording ──
+  async toggleRecord() {
+    if (this.recording) { this._stopRecord(); return; }
+    try {
+      this._recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      showToast('Microphone permission denied');
+      return;
+    }
+    this._recChunks = [];
+    this._mediaRec = new MediaRecorder(this._recStream);
+    this._mediaRec.ondataavailable = e => { if (e.data && e.data.size > 0) this._recChunks.push(e.data); };
+    this._mediaRec.onstop = async () => {
+      this._recStream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(this._recChunks, { type: this._mediaRec.mimeType || 'audio/webm' });
+      try {
+        this.voiceBuf = await this.ensureCtx().decodeAudioData(await blob.arrayBuffer());
+        document.getElementById('voice-status').textContent =
+          `✅ Recording ready (${this._fmtDur(this.voiceBuf.duration)})`;
+        showToast('Recording saved as voiceover');
+      } catch (e) {
+        document.getElementById('voice-status').textContent = '⚠ Recording could not be decoded';
+      }
+    };
+    this._mediaRec.start();
+    this.recording = true;
+    document.getElementById('voice-rec-btn').textContent = '⏹ Stop';
+    document.getElementById('voice-status').textContent = '🔴 Recording… click Stop when done';
+  },
+
+  _stopRecord() {
+    if (this._mediaRec && this._mediaRec.state !== 'inactive') this._mediaRec.stop();
+    this.recording = false;
+    document.getElementById('voice-rec-btn').textContent = '⏺ Record';
+  },
+
+  // ── Playback (synced with animation) ──
+  _previewStartedAt: null,
+  _previewOffset: 0,
+
+  startPreview(offset = 0) {
+    this.stopPreview();
+    if (offset === 0) this._previewOffset = 0;
+    if (!this.voiceBuf && !this.musicBuf) return;
+    const actx = this.ensureCtx();
+    if (this.voiceBuf) {
+      this._voiceSrc = actx.createBufferSource();
+      this._voiceSrc.buffer = this.voiceBuf;
+      this._voiceSrc.connect(this.voiceGain);
+      this._voiceSrc.start(0, Math.min(offset, this.voiceBuf.duration));
+    }
+    if (this.musicBuf) {
+      this._musicSrc = actx.createBufferSource();
+      this._musicSrc.buffer = this.musicBuf;
+      this._musicSrc.loop = true;
+      this._musicSrc.connect(this.musicGain);
+      this._musicSrc.start(0, Math.min(offset, this.musicBuf.duration));
+    }
+    this._previewStartedAt = performance.now();
+  },
+
+  resumePreview() {
+    this.startPreview(this._previewOffset);
+  },
+
+  stopPreview() {
+    if (this._previewStartedAt !== null) {
+      this._previewOffset += (performance.now() - this._previewStartedAt) / 1000;
+      this._previewStartedAt = null;
+    }
+    try { if (this._voiceSrc) { this._voiceSrc.stop(); this._voiceSrc = null; } } catch (e) {}
+    try { if (this._musicSrc) { this._musicSrc.stop(); this._musicSrc = null; } } catch (e) {}
+  },
+};
 </script>
 </body>
 </html>
