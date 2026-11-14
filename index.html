@@ -3410,10 +3410,6 @@ input[type="number"]:focus { border-color: var(--accent); }
           onchange="FilesLib.addMedia(this.files); this.value='';">
         <div id="files-media-list" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;"></div>
       </div>
-      <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
-        <span class="section-sublabel" style="margin:0;">Board writing sound</span>
-        <button class="toggle on" id="scribble-toggle" onclick="toggleScribble()" title="Marker-on-board sound while the hand draws"></button>
-      </div>
       <div>
         <div class="section-sublabel">Voiceover</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -3434,15 +3430,6 @@ input[type="number"]:focus { border-color: var(--accent); }
         <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="AudioEngine.loadMusicFile(this.files[0]); this.value='';">
         <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">No music — upload an audio file</div>
       </div>
-      <div>
-        <div class="section-sublabel" style="display:flex;justify-content:space-between;">
-          <span>Music volume</span><span class="slider-val" id="music-vol-val">15%</span>
-        </div>
-        <div class="slider-row">
-          <input type="range" id="music-vol" min="0" max="100" value="15"
-            oninput="updateSliderFill(this);AudioEngine.setMusicVolume(this.value);">
-        </div>
-      </div>
       <div style="font-size:10px;color:var(--muted);line-height:1.4;">
         Audio plays in sync when you play the animation. It is included in MP4 export (Chrome/Edge).
       </div>
@@ -3460,6 +3447,27 @@ input[type="number"]:focus { border-color: var(--accent); }
 
       <!-- Hand movement toggle moves here -->
       <div id="settings-handglide-slot"></div>
+
+      <!-- Board writing sound + music volume live here -->
+      <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="section-sublabel" style="margin:0;">Board writing sound</span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="document.getElementById('writing-sound-input').click()" title="Use your own writing sound (MP3)"
+            style="font-size:10px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">🔊 Sound file</button>
+          <button class="toggle on" id="scribble-toggle" onclick="toggleScribble()" title="Writing sound while the pen touches the board"></button>
+        </div>
+      </div>
+      <input type="file" id="writing-sound-input" accept="audio/*" style="display:none"
+        onchange="AudioEngine.loadWritingSound(this.files[0]); this.value='';">
+      <div>
+        <div class="section-sublabel" style="display:flex;justify-content:space-between;">
+          <span>Music volume</span><span class="slider-val" id="music-vol-val">15%</span>
+        </div>
+        <div class="slider-row">
+          <input type="range" id="music-vol" min="0" max="100" value="15"
+            oninput="updateSliderFill(this);AudioEngine.setMusicVolume(this.value);">
+        </div>
+      </div>
 
       <!-- Video Size moves here -->
       <div id="settings-videosize-slot"></div>
@@ -11305,44 +11313,74 @@ const AudioEngine = {
     document.getElementById('voice-rec-btn').textContent = '⏺ Record';
   },
 
-  // ── Board writing (scribble) sound ──
+  // ── Board writing (pen touchdown) sound ──
   scribbleEnabled: true,
-  _scribbleSrc: null,
-  _scribbleGain: null,
+  writingBuf: null,
+  _writingLoaded: false,       // bundled sound tried?
+  _writingSrc: null,
+  _writingGain: null,
   _lastTip: null,
+  _writeWatchdog: null,
+  WRITING_GAIN: 2.0,           // 200%
 
-  initScribble() {
-    if (this._scribbleSrc) return;
+  async _ensureWritingBuf() {
+    if (this.writingBuf || this._writingLoaded) return;
+    this._writingLoaded = true;
+    try {
+      const res = await fetch('sounds/writing-on-paper.mp3');
+      const ab = await res.arrayBuffer();
+      this.writingBuf = await this.ensureCtx().decodeAudioData(ab);
+    } catch (e) { /* bundled sound missing — silent fallback */ }
+  },
+
+  async loadWritingSound(file) {
+    if (!file) return;
+    try {
+      this.writingBuf = await this._decode(file);
+      this._writingLoaded = true;
+      showToast('Writing sound loaded');
+      // if currently writing, swap immediately
+      if (this._writingActive) {
+        this._startWritingSource();
+      }
+    } catch (e) { showToast('Could not decode that sound file'); }
+  },
+
+  _startWritingSource() {
     const actx = this.ensureCtx();
-    const len = actx.sampleRate;                 // 1 second of noise
-    const buf = actx.createBuffer(1, len, actx.sampleRate);
-    const dta = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < len; i++) {              // brownish noise = soft marker friction
-      const white = Math.random() * 2 - 1;
-      last = (last + 0.02 * white) / 1.02;
-      dta[i] = last * 3.2;
+    try { if (this._writingSrc) { this._writingSrc.stop(); } } catch (e) {}
+    this._writingSrc = actx.createBufferSource();
+    this._writingSrc.buffer = this.writingBuf;
+    this._writingSrc.loop = true;
+    if (!this._writingGain) {
+      this._writingGain = actx.createGain();
+      this._writingGain.connect(actx.destination);
     }
-    this._scribbleSrc = actx.createBufferSource();
-    this._scribbleSrc.buffer = buf;
-    this._scribbleSrc.loop = true;
-    const bp = actx.createBiquadFilter();
-    bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.7;
-    this._scribbleGain = actx.createGain();
-    this._scribbleGain.gain.value = 0;
-    this._scribbleSrc.connect(bp);
-    bp.connect(this._scribbleGain);
-    this._scribbleGain.connect(actx.destination);
-    this._scribbleSrc.start();
+    this._writingSrc.connect(this._writingGain);
+    this._writingSrc.start(0, Math.random() * 0.3);   // random offset so repeats vary
   },
 
   scribble(active) {
     if (!this.scribbleEnabled) active = false;
+    const wasActive = this._writingActive;
+    this._writingActive = active;
+
     if (active) {
-      this.initScribble();
-      if (this._scribbleGain) this._scribbleGain.gain.setTargetAtTime(0.09, this.actx.currentTime, 0.03);
-    } else if (this._scribbleGain && this.actx) {
-      this._scribbleGain.gain.setTargetAtTime(0, this.actx.currentTime, 0.05);
+      this._ensureWritingBuf().then(() => {
+        if (!this.writingBuf || !this._writingActive) return;
+        if (!this._writingSrc) this._startWritingSource();
+        if (this._writingGain) {
+          this._writingGain.gain.setTargetAtTime(
+            Math.min(this.WRITING_GAIN, 2.0), this.actx.currentTime, 0.02);
+        }
+      });
+      // watchdog: pen lifted? stop shortly after the last movement
+      clearTimeout(this._writeWatchdog);
+      this._writeWatchdog = setTimeout(() => this.scribble(false), 140);
+    } else if (wasActive && this._writingGain && this.actx) {
+      this._writingGain.gain.setTargetAtTime(0, this.actx.currentTime, 0.04);
+      const src = this._writingSrc;
+      setTimeout(() => { if (!this._writingActive && src) { try { src.stop(); } catch (e) {} if (this._writingSrc === src) this._writingSrc = null; } }, 250);
     }
   },
 
@@ -11388,7 +11426,10 @@ const AudioEngine = {
     }
     try { if (this._voiceSrc) { this._voiceSrc.stop(); this._voiceSrc = null; } } catch (e) {}
     try { if (this._musicSrc) { this._musicSrc.stop(); this._musicSrc = null; } } catch (e) {}
-    this.scribble(false);
+    this._writingActive = false;
+    if (this._writingGain && this.actx) this._writingGain.gain.value = 0;
+    try { if (this._writingSrc) { this._writingSrc.stop(); this._writingSrc = null; } } catch (e) {}
+    clearTimeout(this._writeWatchdog);
     this._lastTip = null;
   },
 };
