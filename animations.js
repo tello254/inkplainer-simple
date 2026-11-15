@@ -2056,6 +2056,16 @@ function generate() {
 function _runGroupAt(gpos) {
   if (!state._animGroups || gpos >= state._animGroups.length) { _allLayersDone(); return; }
   state._groupPos = gpos;
+  // Timeline instrumentation: record previous group's real duration + stamp this group's start
+  try {
+    if (!state._groupDurs) state._groupDurs = [];
+    if (gpos > 0) {
+      const prev = state._animGroups[gpos - 1] || [];
+      const ds = prev.map(l => l._measuredDur || 0).filter(x => x > 0);
+      if (ds.length) state._groupDurs[gpos - 1] = Math.max(...ds);
+    }
+    state._groupT0 = performance.now();
+  } catch (e) {}
   const group     = state._animGroups[gpos];
 
   // Pre-build the final image canvas for live reveal blending
@@ -2176,6 +2186,14 @@ function _runGroupAt(gpos) {
 }
 
 function _allLayersDone() {
+  // Timeline instrumentation: record the final group's real duration
+  try {
+    if (!state._groupDurs) state._groupDurs = [];
+    const gpos = state._groupPos ?? 0;
+    const cur = (state._animGroups || [])[gpos] || [];
+    const ds = cur.map(l => l._measuredDur || 0).filter(x => x > 0);
+    if (ds.length) state._groupDurs[gpos] = Math.max(...ds);
+  } catch (e) {}
   state._activeSlots  = [];
   state._currentSlot  = null;
   state._slotMode     = false;
@@ -3435,6 +3453,7 @@ function finishAnim() {
     }
     // Mark slot done; _tickAllSlots will detect when all slots finish
     slot.done = true;
+    try { if (slot.layer) slot.layer._measuredDur = Math.max(0.3, (performance.now() - (state._groupT0 || performance.now())) / 1000); } catch (e) {}
     hctx.clearRect(0, 0, state.canvasW, state.canvasH);
     setProgress(1);
     return; // _tickAllSlots handles group advancement

@@ -3408,10 +3408,12 @@ input[type="number"]:focus { border-color: var(--accent); }
       <div>
         <div class="section-sublabel">Images &amp; Video</div>
         <button id="files-media-btn" onclick="document.getElementById('files-media-input').click()"
-          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Add images / video</button>
-        <input type="file" id="files-media-input" accept="image/*,video/*" multiple style="display:none"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">＋ Add files (images / audio / video)</button>
+        <input type="file" id="files-media-input" accept="image/*,audio/*,video/*" multiple style="display:none"
           onchange="FilesLib.addMedia(this.files); this.value='';">
-        <div id="files-media-list" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;"></div>
+        <button id="files-use-btn" onclick="FilesLib.useSelected()" style="display:none;width:100%;margin-top:6px;
+          font-size:11px;padding:6px;border:none;border-radius:7px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;">Use → Workspace</button>
+        <div id="files-media-list" style="margin-top:6px;"></div>
       </div>
       <div>
         <div class="section-sublabel">Voiceover</div>
@@ -3488,6 +3490,28 @@ input[type="number"]:focus { border-color: var(--accent); }
       </div>
       <div id="drawing-settings-section" style="display:none;flex-direction:column;gap:12px;"></div>
 
+      <!-- Canvas Background — presets + custom color, hidden unless Background is toggled -->
+      <div class="toggle-row" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="section-sublabel" style="margin:0;">Background</span>
+        <button class="toggle" id="bg-settings-toggle" onclick="toggleBgSettings()" title="Change the canvas background"></button>
+      </div>
+      <div id="settings-bg-slot" style="display:none;flex-direction:column;"></div>
+
+    </div>
+  </div>
+
+  <!-- ════ WORKSPACE MANAGER: files sent here from the Files card ════ -->
+  <div class="sidebar-section-label">Workspace</div>
+  <div class="card collapsed" id="card-workspace-mgr">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-header-label">Workspace Manager</div>
+      <span class="card-chevron">▾</span>
+    </div>
+    <div class="card-body" id="wm-body" style="flex-direction:column;gap:12px;">
+      <div id="wm-empty" style="font-size:10px;color:var(--muted);line-height:1.5;">
+        Select files in <b>Files</b>, then press <b>Use</b> to send them here.<br>Images become numbered cuts on the timeline below.
+      </div>
+      <div id="wm-groups"></div>
     </div>
   </div>
 
@@ -4030,38 +4054,74 @@ input[type="number"]:focus { border-color: var(--accent); }
       <span id="time-display">0%</span>
     </div>
 
-    <!-- ════════ WORKSPACE (cut timeline) ════════ -->
+    <!-- ════════ TIMELINE v2 (to-scale cut timeline, CapCut-style) ════════ -->
     <style>
-      #workspace { position:absolute; left:0; right:0; bottom:0; height:74px; background:var(--bg);
-        border-top:1px solid var(--border); overflow:hidden; }
-      #workspace-strip { position:absolute; inset:6px 12px; overflow:hidden; }
-      #workspace-cuts { position:absolute; top:4px; bottom:4px; left:0; display:flex; gap:6px; transition:transform 0.08s linear; }
-      .ws-cut { min-width:86px; max-width:130px; height:100%; background:var(--panel); border:1px solid var(--border);
-        border-radius:8px; padding:6px 8px; cursor:pointer; flex-shrink:0; display:flex; flex-direction:column; gap:2px; }
-      .ws-cut:hover { border-color:var(--border-hi); }
-      .ws-cut.selected { border-color:var(--accent); background:var(--accent-lo); }
-      .ws-cut.drag-over { border-color:var(--accent2); }
-      .ws-cut-num { font-size:10px; font-weight:700; color:var(--accent); }
-      .ws-cut-name { font-size:10px; color:var(--muted-hi); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      .ws-empty { font-size:10px; color:var(--muted); padding:8px 4px; }
-      #workspace-playhead { position:absolute; top:2px; bottom:2px; left:20px; width:2px; background:var(--accent2); border-radius:2px; pointer-events:none; z-index:2; }
+      #timeline { position:absolute; left:0; right:0; bottom:0; height:148px; background:var(--bg);
+        border-top:1px solid var(--border); display:flex; overflow:hidden; z-index:5; }
+      #tl-labels { width:40px; flex-shrink:0; background:var(--bg); border-right:1px solid var(--border);
+        display:flex; flex-direction:column; }
+      #tl-labels .tl-label-head { height:22px; display:flex; align-items:center; justify-content:center; }
+      .tl-row-label { height:30px; display:flex; align-items:center; justify-content:center;
+        font-size:10px; color:var(--muted); border-bottom:1px solid var(--border); position:relative; }
+      #tl-add-row { width:24px; height:20px; border:1px solid var(--border-hi); border-radius:5px;
+        background:var(--panel); color:var(--muted-hi); font-size:12px; line-height:1; cursor:pointer; }
+      #tl-add-row:hover { color:var(--accent); border-color:var(--accent); }
+      .tl-row-del { position:absolute; right:1px; top:1px; width:14px; height:14px; font-size:9px; line-height:12px;
+        border:none; background:none; color:var(--muted); cursor:pointer; padding:0; }
+      .tl-row-del:hover { color:#ff5566; }
+      #tl-scroll { flex:1; overflow-x:auto; overflow-y:hidden; position:relative; scrollbar-width:thin; }
+      #tl-content { position:relative; min-width:100%; height:100%; }
+      #tl-ruler { position:sticky; top:0; height:22px; background:var(--bg); border-bottom:1px solid var(--border);
+        z-index:3; pointer-events:none; }
+      .tl-tick { position:absolute; bottom:0; width:1px; height:6px; background:var(--muted); opacity:.5; }
+      .tl-tick.big { height:10px; opacity:.8; }
+      .tl-tick-label { position:absolute; bottom:7px; font-size:9px; color:var(--muted); transform:translateX(3px); white-space:nowrap; }
+      .tl-row { position:relative; height:30px; border-bottom:1px solid var(--border); }
+      .tl-cut { position:absolute; top:3px; height:24px; border-radius:6px; padding:0 6px; overflow:hidden;
+        display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+      .tl-cut .tl-cut-num { font-size:9px; font-weight:800; opacity:.9; }
+      .tl-cut .tl-cut-name { font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.95; }
+      .tl-cut.image  { background:#f59e0b; color:#241a02; }
+      .tl-cut.voice  { background:#22c55e; color:#03230f; }
+      .tl-cut.record { background:#3b82f6; color:#04122b; }
+      .tl-cut.music  { background:#ef4444; color:#2b0404; }
+      .tl-cut.selected { outline:2px solid var(--accent); outline-offset:1px; }
+      .tl-cut.unlocked { outline:2px dashed #fff; outline-offset:1px; cursor:grabbing; }
+      .tl-cut .tl-lock { font-size:8px; opacity:.8; }
+      #tl-playhead { position:absolute; top:0; bottom:0; width:2px; background:var(--accent2); z-index:4;
+        pointer-events:none; box-shadow:0 0 6px var(--accent2); }
+      #tl-playhead::before { content:''; position:absolute; top:0; left:-4px; border:5px solid transparent;
+        border-top-color:var(--accent2); }
+      #tl-empty { position:absolute; top:30px; left:16px; font-size:10px; color:var(--muted); }
+      /* Slim playbar capsule */
+      #playbar { padding:4px 12px; min-width:240px; gap:8px; bottom:158px; }
+      #playbar .play-btn svg { width:14px; height:14px; }
+      .progress-bar { height:4px; }
     </style>
-    <div id="workspace">
-      <div id="workspace-strip">
-        <div id="workspace-playhead"></div>
-        <div id="workspace-cuts"></div>
+    <div id="timeline">
+      <div id="tl-labels">
+        <div class="tl-row-label"><button id="tl-add-row" title="Add a parallel row">＋</button></div>
+      </div>
+      <div id="tl-scroll">
+        <div id="tl-content">
+          <div id="tl-ruler"></div>
+          <div id="tl-rows"></div>
+          <div id="tl-empty">Add images in Files → press Use → they appear here as cuts</div>
+          <div id="tl-playhead" style="left:0"></div>
+        </div>
       </div>
     </div>
     <script>
-      // show workspace once it has content; keep playbar above it
+      // keep slim playbar above the timeline
       (function () {
-        const ws = document.getElementById('workspace');
         const pb = document.getElementById('playbar');
-        if (ws && pb) {
-          const sync = () => pb.style.bottom = ws.style.display === 'none' ? '' : '80px';
-          new MutationObserver(sync).observe(ws, { attributes: true, attributeFilter: ['style'] });
-          sync();
-        }
+        if (pb) pb.style.bottom = '158px';
+        // scrub: click empty timeline/ruler area → playhead moves there
+        const tc = document.getElementById('tl-content');
+        if (tc) tc.addEventListener('click', e => {
+          if (e.target.closest('.tl-cut')) return;   // cuts handle their own clicks
+          if (typeof Workspace !== 'undefined' && Workspace.scrub) Workspace.scrub(e);
+        });
       })();
     </script>
   </div>
@@ -4120,79 +4180,21 @@ input[type="number"]:focus { border-color: var(--accent); }
     </div>
   </div>
 
-  <!-- Input Mode card -->
+  <!-- Input card — compact: uploads live in Files; text tool stays reachable -->
   <div class="input-card">
-    <div class="section-label">Input Mode</div>
-    <div class="tab-group">
-      <button class="tab-btn active" onclick="switchTab('image')">Image</button>
-      <button class="tab-btn"        onclick="switchTab('text')">Text</button>
+    <div class="section-label">Add content</div>
+    <div style="display:flex;gap:6px;">
+      <button class="tab-btn" style="flex:1;" onclick="switchTab('image')">🖼 Files</button>
+      <button class="tab-btn" style="flex:1;" onclick="switchTab('text')">🅣 Text</button>
     </div>
 
-    <!-- IMAGE PANEL -->
-    <div id="image-panel">
-      <div id="drop-zone" onclick="document.getElementById('file-input').click()">
-        <div class="drop-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-        </div>
-        <div class="drop-primary">Drop images or <span>browse</span></div>
-        <div class="drop-secondary">PNG, JPG, GIF, SVG · Multiple files OK</div>
-      </div>
-      <input type="file" id="file-input" accept="image/*" multiple>
-
-      <!-- Background section -->
-      <div style="margin-top:14px">
-        <div class="section-label">Canvas Background</div>
-        <div class="bg-row">
-          <div class="bg-pill active" onclick="selectBgPreset(this,'solid','white')">White</div>
-          <div class="bg-pill"        onclick="selectBgPreset(this,'solid','#000000')">Black</div>
-          <div class="bg-pill"        onclick="selectBgPreset(this,'solid','transparent')">None</div>
-        </div>
-        <div class="bg-color-row">
-          <div class="bg-color-swatch" id="bg-custom-swatch" style="background:#ffffff" title="Pick a solid color">
-            <input type="color" id="bg-color-input" value="#ffffff" oninput="onBgColorInput(this.value)">
-          </div>
-          <span class="bg-color-label">Custom solid color</span>
-        </div>
-        <div class="bg-section-label" style="margin-top:12px">Presets</div>
-        <div class="bg-presets" id="bg-presets">
-          <div class="bg-preset" title="Notebook" data-bg-key="notebook"
-            style="background:linear-gradient(#e8eef4 1px,transparent 1px) 0 0/100% 22px,linear-gradient(90deg,#d0dae4 1px,transparent 1px) 0 0/22px 100%,#f4f8fc"
-            onclick="selectBgPreset(this,'gradient','notebook')"></div>
-          <div class="bg-preset" title="Graph" data-bg-key="graph"
-            style="background:linear-gradient(#c8d8e4 1px,transparent 1px) 0 0/100% 20px,linear-gradient(90deg,#c8d8e4 1px,transparent 1px) 0 0/20px 100%,#f0f6fa"
-            onclick="selectBgPreset(this,'gradient','graph')"></div>
-          <div class="bg-preset" title="Cream" data-bg-key="cream"
-            style="background:radial-gradient(ellipse at 30% 20%,#ede0c4 0%,#e8d5a0 40%,#d4b87a 100%)"
-            onclick="selectBgPreset(this,'gradient','cream')"></div>
-          <div class="bg-preset" title="Chalkboard" data-bg-key="chalk"
-            style="background:radial-gradient(ellipse at 50% 50%,#2d4a3e 0%,#1a3328 60%,#0f2318 100%)"
-            onclick="selectBgPreset(this,'gradient','chalk')"></div>
-          <div class="bg-preset" title="Soft gradient" data-bg-key="softgrad"
-            style="background:linear-gradient(135deg,#f5f0ff 0%,#e8f4ff 50%,#f0fff4 100%)"
-            onclick="selectBgPreset(this,'gradient','softgrad')"></div>
-          <div class="bg-preset" title="Warm white" data-bg-key="warmwhite"
-            style="background:#fafaf7"
-            onclick="selectBgPreset(this,'gradient','warmwhite')"></div>
-          <div class="bg-preset" title="Blueprint" data-bg-key="blueprint"
-            style="background:linear-gradient(#1a5276 1px,transparent 1px) 0 0/100% 20px,linear-gradient(90deg,#1a5276 1px,transparent 1px) 0 0/20px 100%,#1a3a5c"
-            onclick="selectBgPreset(this,'gradient','blueprint')"></div>
-          <div class="bg-preset" title="Kraft" data-bg-key="kraft"
-            style="background:repeating-linear-gradient(45deg,#c4973a22 0,#c4973a22 1px,transparent 0,transparent 50%),#c8973a;background-size:6px 6px,100% 100%"
-            onclick="selectBgPreset(this,'gradient','kraft')"></div>
-          <div class="bg-preset" title="Dark" data-bg-key="dark"
-            style="background:#0f0f11;border:1px solid #333"
-            onclick="selectBgPreset(this,'gradient','dark')"></div>
-          <div class="bg-preset" title="Linen" data-bg-key="linen"
-            style="background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px),#f5ede0"
-            onclick="selectBgPreset(this,'gradient','linen')"></div>
-        </div>
+    <!-- IMAGE PANEL — uploads live in the Files card now; drop zone removed -->
+    <div id="image-panel" style="display:none">
+      <input type="file" id="file-input" accept="image/*" multiple style="display:none">
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5;">
+        Images are added from the <b>Files</b> card in the left sidebar.
       </div>
     </div>
-
     <!-- TEXT PANEL -->
     <div id="text-panel" style="display:none">
 
@@ -4301,6 +4303,55 @@ input[type="number"]:focus { border-color: var(--accent); }
     Drop images above to begin
   </div>
   <div id="layer-list"></div>
+
+  <!-- Background section (kept for JS; moved into the Settings card at load) -->
+  <div id="bg-section" style="display:none">
+    <div class="section-label">Canvas Background</div>
+    <div class="bg-row">
+      <div class="bg-pill active" onclick="selectBgPreset(this,'solid','white')">White</div>
+      <div class="bg-pill"        onclick="selectBgPreset(this,'solid','#000000')">Black</div>
+      <div class="bg-pill"        onclick="selectBgPreset(this,'solid','transparent')">None</div>
+    </div>
+    <div class="bg-color-row">
+      <div class="bg-color-swatch" id="bg-custom-swatch" style="background:#ffffff" title="Pick a solid color">
+        <input type="color" id="bg-color-input" value="#ffffff" oninput="onBgColorInput(this.value)">
+      </div>
+      <span class="bg-color-label">Custom solid color</span>
+    </div>
+    <div class="bg-section-label" style="margin-top:12px">Presets</div>
+    <div class="bg-presets" id="bg-presets">
+      <div class="bg-preset" title="Notebook" data-bg-key="notebook"
+        style="background:linear-gradient(#e8eef4 1px,transparent 1px) 0 0/100% 22px,linear-gradient(90deg,#d0dae4 1px,transparent 1px) 0 0/22px 100%,#f4f8fc"
+        onclick="selectBgPreset(this,'gradient','notebook')"></div>
+      <div class="bg-preset" title="Graph" data-bg-key="graph"
+        style="background:linear-gradient(#c8d8e4 1px,transparent 1px) 0 0/100% 20px,linear-gradient(90deg,#c8d8e4 1px,transparent 1px) 0 0/20px 100%,#f0f6fa"
+        onclick="selectBgPreset(this,'gradient','graph')"></div>
+      <div class="bg-preset" title="Cream" data-bg-key="cream"
+        style="background:radial-gradient(ellipse at 30% 20%,#ede0c4 0%,#e8d5a0 40%,#d4b87a 100%)"
+        onclick="selectBgPreset(this,'gradient','cream')"></div>
+      <div class="bg-preset" title="Chalkboard" data-bg-key="chalk"
+        style="background:radial-gradient(ellipse at 50% 50%,#2d4a3e 0%,#1a3328 60%,#0f2318 100%)"
+        onclick="selectBgPreset(this,'gradient','chalk')"></div>
+      <div class="bg-preset" title="Soft gradient" data-bg-key="softgrad"
+        style="background:linear-gradient(135deg,#f5f0ff 0%,#e8f4ff 50%,#f0fff4 100%)"
+        onclick="selectBgPreset(this,'gradient','softgrad')"></div>
+      <div class="bg-preset" title="Warm white" data-bg-key="warmwhite"
+        style="background:#fafaf7"
+        onclick="selectBgPreset(this,'gradient','warmwhite')"></div>
+      <div class="bg-preset" title="Blueprint" data-bg-key="blueprint"
+        style="background:linear-gradient(#1a5276 1px,transparent 1px) 0 0/100% 20px,linear-gradient(90deg,#1a5276 1px,transparent 1px) 0 0/20px 100%,#1a3a5c"
+        onclick="selectBgPreset(this,'gradient','blueprint')"></div>
+      <div class="bg-preset" title="Kraft" data-bg-key="kraft"
+        style="background:repeating-linear-gradient(45deg,#c4973a22 0,#c4973a22 1px,transparent 0,transparent 50%),#c8973a;background-size:6px 6px,100% 100%"
+        onclick="selectBgPreset(this,'gradient','kraft')"></div>
+      <div class="bg-preset" title="Dark" data-bg-key="dark"
+        style="background:#0f0f11;border:1px solid #333"
+        onclick="selectBgPreset(this,'gradient','dark')"></div>
+      <div class="bg-preset" title="Linen" data-bg-key="linen"
+        style="background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px),#f5ede0"
+        onclick="selectBgPreset(this,'gradient','linen')"></div>
+    </div>
+  </div>
 
 </div><!-- /right-panel -->
 
@@ -5474,7 +5525,15 @@ async function checkStorageUsage() {
 }
 
 // Initialize on load
-setTimeout(() => {
+// BUG FIX: this used to be a plain 100ms setTimeout — on large projects the
+// main script (later in the document) can still be parsing when it fires,
+// so `state` / `initCanvas` were undefined and the auto-restore silently
+// failed (project appeared wiped after reload). Now we wait for the app.
+function _waitForAppReady(cb) {
+  if (typeof state !== 'undefined' && typeof initCanvas === 'function') { cb(); return; }
+  setTimeout(() => _waitForAppReady(cb), 50);
+}
+_waitForAppReady(() => {
   // Initialize canvas with default dimensions BEFORE loading project
   // This prevents the "zoomed in" bug when adding first image
   // Wait a bit for DOM to fully settle
@@ -5504,7 +5563,7 @@ setTimeout(() => {
       createNewProject();
     }
   });
-}, 100);
+});
 
 // ─── UI HELPERS (new for v12) ───
 
@@ -6283,6 +6342,16 @@ function _generateNow() {
 function _runGroupAt(gpos) {
   if (!state._animGroups || gpos >= state._animGroups.length) { _allLayersDone(); return; }
   state._groupPos = gpos;
+  // Timeline instrumentation: record previous group's real duration + stamp this group's start
+  try {
+    if (!state._groupDurs) state._groupDurs = [];
+    if (gpos > 0) {
+      const prev = state._animGroups[gpos - 1] || [];
+      const ds = prev.map(l => l._measuredDur || 0).filter(x => x > 0);
+      if (ds.length) state._groupDurs[gpos - 1] = Math.max(...ds);
+    }
+    state._groupT0 = performance.now();
+  } catch (e) {}
   const group     = state._animGroups[gpos];
 
   // Pre-build the final image canvas for live reveal blending
@@ -6404,6 +6473,14 @@ function _runGroupAt(gpos) {
 }
 
 function _allLayersDone() {
+  // Timeline instrumentation: record the final group's real duration
+  try {
+    if (!state._groupDurs) state._groupDurs = [];
+    const gpos = state._groupPos ?? 0;
+    const cur = (state._animGroups || [])[gpos] || [];
+    const ds = cur.map(l => l._measuredDur || 0).filter(x => x > 0);
+    if (ds.length) state._groupDurs[gpos] = Math.max(...ds);
+  } catch (e) {}
   state._activeSlots  = [];
   state._currentSlot  = null;
   state._slotMode     = false;
@@ -6514,7 +6591,13 @@ function renderLayerList() {
   const count = document.getElementById('layer-count');
   count.textContent = `${state.layers.length} layer${state.layers.length!==1?'s':''}`;
   empty.style.display = state.layers.length ? 'none' : 'block';
-  try { Workspace.render(); FilesLib.render(); } catch (e) {}
+  try {
+    // keep timeline cuts in sync with the layer set (rebuild on add/remove/restore)
+    const imgCutIds = Workspace.cuts.filter(c => c.kind === 'image').map(c => c.layerId).sort().join(',');
+    const layerIds = state.layers.map(l => l.id).sort().join(',');
+    if (imgCutIds !== layerIds) Workspace.rebuildFromLayers();
+    Workspace.render(); FilesLib.render();
+  } catch (e) {}
 
   const reversed = [...state.layers].reverse();
   list.innerHTML = '';
@@ -8313,16 +8396,18 @@ document.getElementById('spec-tile-slider').addEventListener('input', function()
 });
 document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
 
-// ─── FILE UPLOAD (multi) ───
+// ─── FILE UPLOAD (multi) — drop zone removed; uploads live in the Files card ───
 const dropZone  = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
-dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e=>{
-  e.preventDefault(); dropZone.classList.remove('drag-over');
-  Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')).forEach(loadImageFile);
-});
-fileInput.addEventListener('change', ()=>{ Array.from(fileInput.files).forEach(loadImageFile); fileInput.value=''; });
+if (dropZone) {
+  dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e=>{
+    e.preventDefault(); dropZone.classList.remove('drag-over');
+    Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')).forEach(loadImageFile);
+  });
+}
+if (fileInput) fileInput.addEventListener('change', ()=>{ Array.from(fileInput.files).forEach(loadImageFile); fileInput.value=''; });
 
 function loadImageFile(file) {
   const reader = new FileReader();
@@ -8895,9 +8980,13 @@ function setProgress(ratio) {
 
 function animate() {
   if (!state.playing) return;
+  try { Workspace.syncPlayback(); } catch (e) {}
   // Parallel slot mode — tick all active slots then composite
   if (state._activeSlots && state._activeSlots.some(s => !s.done)) {
     AnimationEngine._tickAllSlots();
+    // if the last group just finished in this frame, sync the timeline now
+    // (no further frames are scheduled once done)
+    if (state.done) { try { Workspace.syncPlayback(); } catch (e) {} }
     if (state.playing) state.animFrame = requestAnimationFrame(animate);
     return;
   }
@@ -9026,6 +9115,7 @@ function finishAnim() {
     }
     // Mark slot done; _tickAllSlots will detect when all slots finish
     slot.done = true;
+    try { if (slot.layer) slot.layer._measuredDur = Math.max(0.3, (performance.now() - (state._groupT0 || performance.now())) / 1000); } catch (e) {}
     hctx.clearRect(0, 0, state.canvasW, state.canvasH);
     setProgress(1);
     return; // _tickAllSlots handles group advancement
@@ -11004,22 +11094,10 @@ const OB_KEY = 'wb_onboarding_done_v1';
 // FIX 5: export tip moved to 'left' placement
 const OB_STEPS = [
   {
-    targetId:  'drop-zone',
-    title:     'Add your content here',
-    desc:      'Drop an image file onto this panel, or click it to browse. Each file becomes its own layer.',
-    placement: 'left',   // right panel → tooltip goes left into canvas
-  },
-  {
-    targetId:  'stab-animation',
-    title:     'Animation tab — fast styles',
-    desc:      'Pick a ready-to-use animation style and hit Generate. Great for getting a result in under a minute.',
-    placement: 'right',  // left sidebar → tooltip goes right into canvas
-  },
-  {
-    targetId:  'stab-drawing',
-    title:     'Drawing tab — full control',
-    desc:      'Fine-tune strokes, outline detection, fills, and reveals. Most of these features don\'t exist in other apps.',
-    placement: 'right',  // left sidebar → tooltip goes right into canvas
+    targetId:  'card-audio',
+    title:     'Add your content in Files',
+    desc:      'Upload images, audio and video in the Files card, select them, then press Use to send them to the Workspace.',
+    placement: 'right',
   },
   {
     targetId:  'btn-generate',
@@ -11033,7 +11111,7 @@ const OB_STEPS = [
     desc:      'When your animation looks right, click Export to save it as a WebM or MP4 video file.',
     placement: 'bottom', // top bar → tooltip goes down below the bar
   },
-];
+].filter(s => document.getElementById(s.targetId));
 
 let obStep = 0;
 let obActive = false;
@@ -11449,58 +11527,119 @@ try {
 } catch (e) {}
 
 // ═══════════════════════════════════════════════════════════════════════════
-// FILES LIBRARY — images/audio/video, images numbered by workspace order
+// FILES LIBRARY v2 — uploads stay here as small cards; Use sends them to the
+// Workspace Manager. Nothing is auto-added to the project anymore.
 // ═══════════════════════════════════════════════════════════════════════════
 const FilesLib = {
-  media: [],   // non-image files (audio/video) stored as library entries
+  media: [],          // {id, name, type:'image'|'audio'|'video', file, dataURL}
+  sel: new Set(),
+  _id: 1,
 
   async addMedia(fileList) {
     for (const f of fileList) {
-      if (f.type.startsWith('image/')) {
-        loadImageFile(f);                    // adds as a workspace layer (auto-classified)
-      } else if (f.type.startsWith('audio/')) {
-        this.media.push({ name: f.name, type: 'audio', size: f.size });
-      } else if (f.type.startsWith('video/')) {
-        this.media.push({ name: f.name, type: 'video', size: f.size });
-      }
+      const type = f.type.startsWith('image/') ? 'image'
+                 : f.type.startsWith('audio/') ? 'audio'
+                 : f.type.startsWith('video/') ? 'video' : null;
+      if (!type) continue;
+      const entry = { id: this._id++, name: f.name.replace(/\.[^.]+$/, ''), type, file: f, dataURL: null };
+      if (type === 'image') entry.dataURL = await this._read(f);
+      this.media.push(entry);
     }
     this.render();
-    setTimeout(() => { this.render(); Workspace.render(); }, 600);  // after layers load async
+  },
+
+  _read(f) {
+    return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); });
+  },
+
+  toggleSel(id) {
+    if (this.sel.has(id)) this.sel.delete(id); else this.sel.add(id);
+    this.render();
+  },
+
+  async useSelected() {
+    const chosen = this.media.filter(m => this.sel.has(m.id));
+    if (!chosen.length) return;
+    const imgs = [];
+    for (const m of chosen) {
+      if (m.type === 'image') {
+        imgs.push(m);
+      } else if (m.type === 'audio') {
+        await AudioEngine.loadVoiceFile(m.file);          // green voiceover cut
+        Workspace.ensureVoiceCut(m.name);
+      } else if (m.type === 'video') {
+        Workspace.videos.push({ name: m.name, size: m.file.size });
+      }
+    }
+    // images: create layers (auto-classified), then rebuild the timeline to scale
+    let pending = imgs.length;
+    imgs.forEach(m => {
+      const img = new Image();
+      img.onload = () => {
+        addLayer(img, m.name);
+        if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); }
+      };
+      img.onerror = () => { if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); } };
+      img.src = m.dataURL;
+    });
+    if (!imgs.length) Workspace.renderAll();
+    this.media = this.media.filter(m => !this.sel.has(m.id));
+    this.sel.clear();
+    this.render();
+    showToast(`Sent ${chosen.length} file${chosen.length !== 1 ? 's' : ''} to the Workspace`);
   },
 
   render() {
     const list = document.getElementById('files-media-list');
     if (!list) return;
-    const items = [];
-    // numbered image layers (workspace order)
-    const seq = Workspace.orderSeq();
-    seq.forEach((l, i) => {
-      items.push(`<div class="files-item" data-layer="${l.id}" onclick="selectLayer(${l.id})"
-        style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:var(--panel);">
-        <span style="font-weight:700;color:var(--accent);min-width:16px;">${i + 1}</span>
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🖼 ${l.name}</span>
-        <button onclick="event.stopPropagation();removeLayer(${l.id});FilesLib.render();Workspace.render();"
-          style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
-      </div>`);
+    const useBtn = document.getElementById('files-use-btn');
+    if (useBtn) useBtn.style.display = this.sel.size ? 'block' : 'none';
+    if (useBtn) useBtn.textContent = `Use ${this.sel.size ? `(${this.sel.size}) ` : ''}→ Workspace`;
+
+    const CARD = 'border:1px solid var(--border);border-radius:8px;background:var(--panel);cursor:pointer;overflow:hidden;position:relative;';
+    const cards = this.media.map(m => {
+      const thumb = m.type === 'image' && m.dataURL
+        ? `<img src="${m.dataURL}" style="width:100%;height:44px;object-fit:cover;display:block;">`
+        : `<div style="width:100%;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;">${m.type === 'audio' ? '🔊' : '🎬'}</div>`;
+      return `<div onclick="FilesLib.toggleSel(${m.id})" title="${m.name}"
+        style="${CARD}${this.sel.has(m.id) ? 'outline:2px solid var(--accent);outline-offset:-2px;' : ''}">
+        ${thumb}
+        <div style="font-size:9px;color:var(--muted-hi);padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</div>
+        <button onclick="event.stopPropagation();FilesLib.remove(${m.id})"
+          style="position:absolute;top:2px;right:2px;width:15px;height:15px;font-size:9px;line-height:13px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;">✕</button>
+      </div>`;
     });
-    // library entries (audio/video)
-    this.media.forEach((m, i) => {
-      items.push(`<div class="files-item" style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--panel);">
-        <span style="font-weight:700;color:var(--muted);min-width:16px;">♪</span>
-        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.type === 'video' ? '🎬' : '🔊'} ${m.name}</span>
-        <button onclick="event.stopPropagation();FilesLib.media.splice(${i},1);FilesLib.render();"
-          style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
-      </div>`);
-    });
-    list.innerHTML = items.join('') || '<div style="font-size:10px;color:var(--muted);">No files yet — add images to build your video.</div>';
+    list.innerHTML = cards.join('')
+      || '<div style="font-size:10px;color:var(--muted);">No files yet. Upload images, audio or video — they stay here until you press Use.</div>';
+    list.style.display = 'grid';
+    list.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    list.style.gap = '5px';
+  },
+
+  remove(id) {
+    this.media = this.media.filter(m => m.id !== id);
+    this.sel.delete(id);
+    this.render();
   },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WORKSPACE — CapCut-style cut timeline (v1)
+// WORKSPACE — to-scale CapCut-style timeline (v2)
+// One x-distance = one duration everywhere. Cuts are sacred: long-press or
+// double-click unlocks a cut for moving; otherwise positions never change.
 // ═══════════════════════════════════════════════════════════════════════════
 const Workspace = {
-  dragId: null,
+  PXS: 60,                       // px per second — THE calibration constant
+  cuts: [],                      // {id, kind:'image'|'voice'|'record'|'music', layerId, name, start, dur, row, _moved}
+  cutId: 1,
+  imgRows: 1,                    // parallel image rows
+  selId: null,
+  unlockedId: null,
+  videos: [],                    // video files sent from Files
+  playT: 0,
+  _lpTimer: null,
+  _lpFired: false,
+  _drag: null,
 
   orderSeq() {
     const withOrder = state.layers.filter(l => l.animOrder != null).sort((a, b) => a.animOrder - b.animOrder);
@@ -11508,51 +11647,399 @@ const Workspace = {
     return [...withOrder, ...rest];
   },
 
-  render() {
-    const cuts = document.getElementById('workspace-cuts');
-    if (!cuts) return;
+  totalDur() { return this.cuts.reduce((m, c) => Math.max(m, c.start + c.dur), 0); },
+
+  // ── Build cuts from layers, TO SCALE ──
+  // Groups = same animOrder (parallel). Group starts are cumulative; within a
+  // group every layer starts together (extra layers go on extra rows).
+  // Real measured durations (from the last Generate) are used when present.
+  rebuildFromLayers() {
+    const old = new Map(this.cuts.filter(c => c.kind === 'image').map(c => [c.layerId, c]));
     const seq = this.orderSeq();
-    cuts.innerHTML = seq.map((l, i) => `
-      <div class="ws-cut${state.selectedLayerId === l.id ? ' selected' : ''}" draggable="true"
-        data-id="${l.id}" onclick="selectLayer(${l.id})">
-        <div class="ws-cut-num">${i + 1}</div>
-        <div class="ws-cut-name">${l.name}</div>
-      </div>`).join('') || '<div class="ws-empty">Your cuts appear here — add images in Files</div>';
-    [...cuts.querySelectorAll('.ws-cut')].forEach(el => {
-      el.addEventListener('dragstart', e => { this.dragId = +el.dataset.id; e.dataTransfer.effectAllowed = 'move'; });
-      el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
-      el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-      el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag-over'); this.reorder(this.dragId, +el.dataset.id); });
-      el.addEventListener('dragend', () => el.classList.remove('drag-over'));
+    const groups = [];
+    seq.forEach(l => {
+      const key = l.animOrder ?? `__${l.id}`;
+      let g = groups.find(x => x.key === key);
+      if (!g) { g = { key, layers: [] }; groups.push(g); }
+      g.layers.push(l);
     });
+
+    const cuts = [];
+    let t = 0;
+    let extraRows = 0;
+    groups.forEach(g => {
+      const durs = g.layers.map(l => l._measuredDur || old.get(l.id)?.dur || 4);
+      g.layers.forEach((l, i) => {
+        const prev = old.get(l.id);
+        const moved = prev?._moved;
+        const row = i === 0 ? 0 : (prev?.row || (1 + extraRows++));
+        const dur = Math.max(0.3, durs[i]);
+        const start = moved && prev ? prev.start : t;
+        cuts.push({
+          id: prev?.id || this.cutId++, kind: 'image', layerId: l.id, name: l.name,
+          start, dur, row, _moved: !!moved,
+        });
+      });
+      t += Math.max(...durs);
+    });
+    // keep audio cuts (voice/record/music) as-is
+    const audio = this.cuts.filter(c => c.kind !== 'image');
+    // image rows needed = 1 + parallel count
+    this.imgRows = Math.max(1, 1 + extraRows);
+    this.cuts = [...cuts, ...audio];
+    this._ensureAudioRows();
+    this.syncAnimOrder();
   },
 
-  reorder(dragId, targetId) {
-    if (!dragId || dragId === targetId) return;
+  ensureVoiceCut(name) {
+    if (!AudioEngine.voiceBuf) return;
+    if (!this.cuts.some(c => c.kind === 'voice')) {
+      this.cuts.push({ id: this.cutId++, kind: 'voice', name: name || 'Voiceover', start: 0, dur: AudioEngine.voiceBuf.duration, row: -1, _moved: false });
+    } else {
+      const v = this.cuts.find(c => c.kind === 'voice');
+      v.dur = AudioEngine.voiceBuf.duration;
+    }
+    this._ensureAudioRows();
+  },
+
+  ensureMusicCut() {
+    if (!AudioEngine.musicBuf) return;
+    if (!this.cuts.some(c => c.kind === 'music')) {
+      this.cuts.push({ id: this.cutId++, kind: 'music', name: 'Music', start: 0, dur: AudioEngine.musicBuf.duration, row: -1, _moved: false });
+    } else {
+      const m = this.cuts.find(c => c.kind === 'music');
+      m.dur = AudioEngine.musicBuf.duration;
+    }
+    this._ensureAudioRows();
+  },
+
+  _ensureAudioRows() {
+    // audio cuts get rows below the image rows (voice first, then music)
+    const a = this.cuts.filter(c => c.kind !== 'image');
+    a.forEach((c, i) => { if (c.row < 0 || c.row === undefined) c.row = this.imgRows + i; });
+  },
+
+  rowCount() {
+    return Math.max(this.imgRows, ...this.cuts.map(c => (c.row ?? 0) + 1), 1);
+  },
+
+  // Row-0 image cuts (sorted by start) define the sequence; parallel cuts
+  // (rows > 0) join the group of the row-0 cut they overlap.
+  syncAnimOrder() {
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+    row0.forEach((c, i) => {
+      c.seq = i + 1;
+      const l = state.layers.find(x => x.id === c.layerId);
+      if (l) l.animOrder = i + 1;
+    });
+    this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) > 0).forEach(c => {
+      const host = row0.find(r => c.start >= r.start && c.start < r.start + r.dur) || row0[row0.length - 1];
+      const l = state.layers.find(x => x.id === c.layerId);
+      if (l && host) l.animOrder = host.seq;
+    });
+    // keep layer stack in timeline order
+    const ordered = row0.map(c => state.layers.find(x => x.id === c.layerId)).filter(Boolean);
+    const parallel = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) > 0)
+      .map(c => state.layers.find(x => x.id === c.layerId)).filter(Boolean);
+    if (ordered.length) {
+      state.layers = [...ordered, ...parallel, ...state.layers.filter(l => !ordered.includes(l) && !parallel.includes(l))];
+    }
+  },
+
+  // ── Rendering ──
+  render() {
+    const rowsEl = document.getElementById('tl-rows');
+    const ruler  = document.getElementById('tl-ruler');
+    const labels = document.getElementById('tl-labels');
+    const empty  = document.getElementById('tl-empty');
+    if (!rowsEl || !ruler) return;
+
+    const total = this.totalDur();
+    const virtEnd = Math.max(total + 30, 60);            // seconds of scrollable runway (infinite-feel)
+    const contentW = Math.max(virtEnd * this.PXS, rowsEl.parentElement.clientWidth);
+    rowsEl.parentElement.style.width = contentW + 'px';
+
+    // ruler ticks — every 1s, labels every 5s
+    let ticks = '';
+    for (let s = 0; s <= virtEnd; s++) {
+      const x = s * this.PXS;
+      if (x > contentW) break;
+      const big = s % 5 === 0;
+      ticks += `<div class="tl-tick${big ? ' big' : ''}" style="left:${x}px"></div>`;
+      if (big) ticks += `<div class="tl-tick-label" style="left:${x}px">${this._fmt(s)}</div>`;
+    }
+    ruler.innerHTML = ticks;
+
+    // rows
+    const nRows = this.rowCount();
+    let html = '';
+    for (let r = 0; r < nRows; r++) {
+      const rowCuts = this.cuts.filter(c => (c.row ?? 0) === r);
+      html += `<div class="tl-row" data-row="${r}">`;
+      html += rowCuts.map(c => this._cutHTML(c)).join('');
+      html += '</div>';
+    }
+    rowsEl.innerHTML = html;
+    empty.style.display = this.cuts.length ? 'none' : 'block';
+
+    // row labels (+ delete for empty parallel image rows)
+    let lbl = `<div class="tl-row-label tl-label-head"><button id="tl-add-row" title="Add a parallel row">＋</button></div>`;
+    for (let r = 0; r < nRows; r++) {
+      const kind = this.cuts.find(c => (c.row ?? 0) === r)?.kind || (r < this.imgRows ? 'image' : null);
+      const icon = kind === 'voice' ? '🎙' : kind === 'music' ? '🎵' : kind === 'record' ? '⏺' : '🖼';
+      const canDel = r > 0 && r < this.imgRows && !this.cuts.some(c => (c.row ?? 0) === r);
+      lbl += `<div class="tl-row-label">${icon}${canDel ? `<button class="tl-row-del" data-row="${r}" title="Remove empty row">✕</button>` : ''}</div>`;
+    }
+    labels.innerHTML = lbl;
+    const addBtn = document.getElementById('tl-add-row');
+    if (addBtn) addBtn.onclick = () => { this.imgRows++; this.render(); };
+    labels.querySelectorAll('.tl-row-del').forEach(b => b.onclick = () => {
+      const r = +b.dataset.row;
+      // shift rows below r up by one
+      this.cuts.forEach(c => { if ((c.row ?? 0) > r) c.row--; });
+      this.imgRows--;
+      this.render(); this.renderWM();
+    });
+
+    // attach cut interactions
+    rowsEl.querySelectorAll('.tl-cut').forEach(el => {
+      const id = +el.dataset.id;
+      el.addEventListener('mousedown', e => this._cutMouseDown(e, id, el));
+      el.addEventListener('dblclick', e => { e.stopPropagation(); this.toggleUnlock(id); });
+    });
+
+    // playhead position
+    this._placePlayhead();
+    this.renderWM();
+  },
+
+  _cutHTML(c) {
+    const isSel = state.selectedLayerId != null && c.layerId === state.selectedLayerId;
+    const locked = this.unlockedId !== c.id;
+    const num = c.kind === 'image' ? c.seq : '';
+    return `<div class="tl-cut ${c.kind}${isSel ? ' selected' : ''}${locked ? '' : ' unlocked'}"
+      data-id="${c.id}" data-kind="${c.kind}"
+      style="left:${c.start * this.PXS}px;width:${Math.max(18, c.dur * this.PXS - 2)}px;">
+      ${num ? `<span class="tl-cut-num">${num}</span>` : ''}
+      <span class="tl-cut-name">${c.name}</span>
+      ${locked ? '<span class="tl-lock">🔒</span>' : ''}
+    </div>`;
+  },
+
+  // ── Interactions ──
+  _cutMouseDown(e, id, el) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    this._lpFired = false;
+    clearTimeout(this._lpTimer);
+    const c = this.cuts.find(x => x.id === id);
+    if (!c) return;
+    // Long-press 450ms unlocks and starts a move drag
+    this._lpTimer = setTimeout(() => {
+      this._lpFired = true;
+      if (this.unlockedId !== id) { this.unlockedId = id; this.render(); }
+      const el2 = document.querySelector(`.tl-cut[data-id="${id}"]`) || el;
+      this._startMove(e, c, el2);
+    }, 450);
+    const up = ev => {
+      clearTimeout(this._lpTimer);
+      if (!this._lpFired) {
+        // plain click — select, unless this cut is already unlocked (then drag)
+        if (this.unlockedId === id) this._startMove(ev, c, el);
+        else if (c.kind === 'image' && c.layerId) selectLayer(c.layerId);
+      }
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mouseup', up);
+  },
+
+  toggleUnlock(id) {
+    this.unlockedId = this.unlockedId === id ? null : id;
+    this.render();
+    showToast(this.unlockedId ? 'Cut unlocked — drag to move it' : 'Cut locked back in place');
+  },
+
+  _startMove(e, c, el) {
+    const startX = e.clientX, startY = e.clientY;
+    const origStart = c.start, origRow = c.row ?? 0;
+    let moved = false;
+    const move = ev => {
+      const dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (!moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      moved = true;
+      const newStart = Math.max(0, origStart + dx / this.PXS);
+      c.start = Math.round(newStart * 4) / 4;                 // snap to 0.25s
+      // vertical: which row is the pointer over?
+      const rowsEl = document.getElementById('tl-rows');
+      const rect = rowsEl.getBoundingClientRect();
+      const r = Math.floor((ev.clientY - rect.top) / 30);
+      const kind = c.kind;
+      const rowKindOk = (row) => {
+        if (row < 0) return false;
+        if (kind === 'image') return row < this.imgRows;
+        return true; // audio can sit on any row below images is fine for now
+      };
+      if (rowKindOk(r) && r !== c.row) {
+        const target = this.cuts.find(o => o !== c && (o.row ?? 0) === r &&
+          c.start < o.start + o.dur && o.start < c.start + c.dur);
+        if (!target) c.row = r;
+      }
+      this.render();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      if (moved) {
+        c._moved = true;
+        pushUndoSnapshot();
+        this.syncAnimOrder();
+        this.render(); this.renderWM();
+        renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave();
+      }
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  },
+
+  // Scrub: click empty timeline → playhead moves there
+  scrub(e) {
+    const content = document.getElementById('tl-content');
+    const rect = content.getBoundingClientRect();
+    const t = Math.max(0, (e.clientX - rect.left) / this.PXS);
+    this.setPlayheadTime(t);
+  },
+
+  setPlayheadTime(t) {
+    this.playT = Math.max(0, t);
+    this._placePlayhead();
+    const td = document.getElementById('time-display');
+    if (td) td.textContent = this._fmt(this.playT);
+    // auto-pan while playing
+    if (state.playing) {
+      const sc = document.getElementById('tl-scroll');
+      const x = this.playT * this.PXS;
+      if (x < sc.scrollLeft + 20 || x > sc.scrollLeft + sc.clientWidth - 60) {
+        sc.scrollLeft = Math.max(0, x - sc.clientWidth * 0.3);
+      }
+    }
+  },
+
+  setPlayhead(ratio) { this.setPlayheadTime(ratio * this.totalDur()); },
+
+  _placePlayhead() {
+    const ph = document.getElementById('tl-playhead');
+    if (ph) ph.style.left = (this.playT * this.PXS) + 'px';
+  },
+
+  // Per-frame during playback: real engine time → playhead (to scale)
+  syncPlayback() {
+    if (state.done) {
+      // once finished: rebuild widths from the fresh measured durations, snap playhead to end
+      if (!this._doneRebuilt) {
+        this._doneRebuilt = true;
+        try { this.rebuildFromLayers(); this.render(); } catch (e) {}
+      }
+      this.setPlayheadTime(this.totalDur());
+      return;
+    }
+    this._doneRebuilt = false;
+    if (!state.playing) return;
+    const durs = state._groupDurs || [];
+    const gpos = state._groupPos ?? 0;
+    let t = 0;
+    for (let g = 0; g < gpos; g++) t += durs[g] || 4;
+    t += (performance.now() - (state._groupT0 || performance.now())) / 1000;
+    this.setPlayheadTime(t);
+  },
+
+  _fmt(s) {
+    s = Math.max(0, Math.floor(s));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  },
+
+  // ── Workspace Manager (sidebar dropdown) ──
+  renderAll() { this.render(); renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave(); },
+
+  renderWM() {
+    const wrap = document.getElementById('wm-groups');
+    const emptyEl = document.getElementById('wm-empty');
+    if (!wrap) return;
+    const imgs = this.cuts.filter(c => c.kind === 'image').sort((a, b) => (a.seq || 999) - (b.seq || 999));
+    const auds = this.cuts.filter(c => c.kind !== 'image');
+    emptyEl.style.display = (imgs.length || auds.length || this.videos.length) ? 'none' : 'block';
+
+    const item = (inner, onclick) =>
+      `<div onclick="${onclick}" style="display:flex;align-items:center;gap:7px;font-size:11px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:var(--panel);">
+        ${inner}</div>`;
+    const del = (fn) => `<button onclick="event.stopPropagation();${fn}"
+      style="margin-left:auto;font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>`;
+
+    let html = '';
+    if (imgs.length) {
+      html += `<div class="section-sublabel" style="margin-bottom:4px;">Images</div>`;
+      html += imgs.map(c => item(
+        `<span style="font-weight:800;color:var(--accent);min-width:14px;">${c.seq}</span>
+         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🖼 ${c.name}</span>
+         <span style="font-size:9px;color:var(--muted);margin-left:auto;">${c.dur.toFixed(1)}s</span>` +
+        del(`Workspace.removeImageCut(${c.id})`),
+        `selectLayer(${c.layerId})`)).join('');
+    }
+    if (auds.length) {
+      html += `<div class="section-sublabel" style="margin:8px 0 4px;">Audio</div>`;
+      html += auds.map(c => item(
+        `<span>${c.kind === 'voice' ? '🎙' : c.kind === 'record' ? '⏺' : '🎵'}</span>
+         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</span>
+         <span style="font-size:9px;color:var(--muted);margin-left:auto;">${c.dur.toFixed(1)}s</span>` +
+        del(`Workspace.removeAudioCut(${c.id})`),
+        `Workspace.selectAudioCut(${c.id})`)).join('');
+    }
+    if (this.videos.length) {
+      html += `<div class="section-sublabel" style="margin:8px 0 4px;">Video</div>`;
+      html += this.videos.map((v, i) => item(
+        `<span>🎬</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${v.name}</span>` +
+        del(`Workspace.videos.splice(${i},1);Workspace.renderWM();`), ``)).join('');
+    }
+    wrap.innerHTML = html;
+  },
+
+  removeImageCut(id) {
+    const c = this.cuts.find(x => x.id === id);
+    if (!c) return;
     pushUndoSnapshot();
-    const seq = this.orderSeq();
-    const from = seq.findIndex(l => l.id === dragId);
-    const to = seq.findIndex(l => l.id === targetId);
-    if (from < 0 || to < 0) return;
-    const [moved] = seq.splice(from, 1);
-    seq.splice(to, 0, moved);
-    // assign explicit order 1..n and reorder the stack to match
-    seq.forEach((l, i) => { l.animOrder = i + 1; });
-    state.layers = [...seq];
-    this.render(); FilesLib.render(); renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave();
+    const l = state.layers.find(x => x.id === c.layerId);
+    if (l) removeLayer(l.id);
+    this.rebuildFromLayers();
+    this.renderAll();
   },
 
-  setPlayhead(ratio) {
-    const strip = document.getElementById('workspace-strip');
-    const ph = document.getElementById('workspace-playhead');
-    const cuts = document.getElementById('workspace-cuts');
-    if (!strip || !ph || !cuts) return;
-    const w = strip.clientWidth;
-    const x = Math.max(0, Math.min(1, ratio)) * (w - 40) + 20;
-    ph.style.left = x + 'px';
-    cuts.style.transform = `translateX(${Math.min(0, 60 - x)}px)`;
+  removeAudioCut(id) {
+    pushUndoSnapshot();
+    const c = this.cuts.find(x => x.id === id);
+    if (c?.kind === 'voice') { try { AudioEngine.clearVoice(); } catch (e) {} }
+    if (c?.kind === 'music') { try { AudioEngine.clearMusic(); } catch (e) {} }
+    this.cuts = this.cuts.filter(x => x.id !== id);
+    this.render(); this.renderWM();
   },
+
+  selectAudioCut(id) { this.selId = id; this.render(); },
 };
+
+// Music loads (via the Files card music button) also become red cuts
+try {
+  const _origLoadMusic = AudioEngine.loadMusicFile.bind(AudioEngine);
+  AudioEngine.loadMusicFile = async function (file) {
+    await _origLoadMusic(file);
+    Workspace.ensureMusicCut();
+    Workspace.render();
+  };
+  const _origLoadVoice = AudioEngine.loadVoiceFile.bind(AudioEngine);
+  AudioEngine.loadVoiceFile = async function (file) {
+    await _origLoadVoice(file);
+    Workspace.ensureVoiceCut();
+    Workspace.render();
+  };
+} catch (e) {}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS REORGANIZER — relocates existing panels into the Settings card
@@ -11562,6 +12049,14 @@ function toggleDrawingSettings() {
   const btn = document.getElementById('drawing-settings-toggle');
   const show = sec.style.display === 'none';
   sec.style.display = show ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('on', show);
+}
+
+function toggleBgSettings() {
+  const sec = document.getElementById('settings-bg-slot');
+  const btn = document.getElementById('bg-settings-toggle');
+  const show = sec.style.display === 'none';
+  sec.style.display = show ? 'block' : 'none';
   if (btn) btn.classList.toggle('on', show);
 }
 
@@ -11596,6 +12091,15 @@ function reorganizeSidebar() {
   if (pane) {
     [...pane.querySelectorAll(':scope > .card')].forEach(c => slotDW.appendChild(c));
     pane.style.display = 'none';
+  }
+
+  // 6. Canvas Background section → hidden Background section inside Settings
+  const bgSlot = $('settings-bg-slot');
+  const bgSection = $('bg-section');
+  if (bgSlot && bgSection) {
+    bgSection.style.display = '';
+    bgSection.style.marginTop = '0';
+    bgSlot.appendChild(bgSection);
   }
 }
 try { reorganizeSidebar(); } catch (e) {}
