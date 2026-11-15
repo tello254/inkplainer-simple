@@ -4054,7 +4054,9 @@ input[type="number"]:focus { border-color: var(--accent); }
     <!-- ════════ TIMELINE v2 (to-scale cut timeline, CapCut-style) ════════ -->
     <style>
       #timeline { position:absolute; left:0; right:0; bottom:0; height:148px; background:var(--bg);
-        border-top:1px solid var(--border); display:flex; overflow:hidden; z-index:5; }
+        border-top:1px solid var(--border); display:flex; overflow-y:auto; overflow-x:hidden; z-index:5; }
+      #timeline::-webkit-scrollbar { width:8px; height:8px; }
+      #timeline::-webkit-scrollbar-thumb { background:var(--border-hi); border-radius:4px; }
       #tl-labels { width:40px; flex-shrink:0; background:var(--bg); border-right:1px solid var(--border);
         display:flex; flex-direction:column; }
       #tl-labels .tl-label-head { height:22px; display:flex; align-items:center; justify-content:center; }
@@ -12090,6 +12092,13 @@ const Workspace = {
 
     // rows — laid out in category bands: images, voiceover, recording, music
     const nRows = this.rowCount();
+    // the strip grows to show every row (scrolls past a sensible max), and the
+    // slim playbar rides above it
+    const tl = document.getElementById('timeline');
+    const H = Math.min(Math.max(148, 24 + nRows * 30 + 8), 340);
+    if (tl) tl.style.height = H + 'px';
+    const pb = document.getElementById('playbar');
+    if (pb) pb.style.bottom = (H + 10) + 'px';
     let html = '';
     for (let r = 0; r < nRows; r++) {
       const rowCuts = this.cuts.filter(c => (c.row ?? 0) === r);
