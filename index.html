@@ -4880,6 +4880,14 @@ function loadProject(projectId) {
           FilesLib._audioOwner = { voiceover: null, music: null, recording: null };
           FilesLib.render();
         }
+        // drop audio cuts whose owning audio file no longer exists — a cut
+        // with nothing behind it would silently export as silence
+        Workspace.cuts = Workspace.cuts.filter(c => {
+          if (c.kind !== 'voice' && c.kind !== 'record' && c.kind !== 'music') return true;
+          const role = c.kind === 'voice' ? 'voiceover' : c.kind === 'record' ? 'recording' : 'music';
+          return FilesLib._audioOwner[role] != null;
+        });
+        Workspace.render();
       } catch (e) {}
       
       // Update topbar displays
@@ -9708,6 +9716,8 @@ async function startRecording() {
 
   try {
     await preloadCurrentHands(); // a frame must never be recorded without its hand
+    // export always plays from the very beginning — drop any preview offset
+    try { AudioEngine.stopPreview(); AudioEngine._previewOffset = 0; } catch (e) {}
     const fmt = state.exportFormat || 'webm';
     if (fmt === 'mp4' && typeof VideoEncoder !== 'undefined') {
       await recordMP4(progressText, progressBar);
@@ -9755,8 +9765,10 @@ function recordWebM(progressText, progressBar) {
       };
       const bitrate = qualityMap[state.exportQuality] || 4000000;
       
-      // Codec selection
+      // Codec selection (with audio when available)
       const mimes = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm;codecs=h264',
@@ -9775,13 +9787,23 @@ function recordWebM(progressText, progressBar) {
       state.chunks = [];
       
       const stream = rec.captureStream(30);
-      const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bitrate });
+      // tap the mixed audio (voiceover + music + pen) into the recording
+      let audioTracks = [];
+      try {
+        const destStream = AudioEngine.beginExportTap();
+        audioTracks = destStream.getAudioTracks();
+        audioTracks.forEach(t => stream.addTrack(t));
+      } catch (e) { console.warn('audio tap unavailable, exporting silent video', e); }
+      const mr = new MediaRecorder(stream, {
+        mimeType: mime, videoBitsPerSecond: bitrate, audioBitsPerSecond: 128000,
+      });
       
       mr.ondataavailable = e => {
         if (e.data && e.data.size > 0) state.chunks.push(e.data);
       };
       
       mr.onstop = () => {
+        try { AudioEngine.endExportTap(0); } catch (e) {}   // disconnect the tap
         const blob = new Blob(state.chunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -9868,13 +9890,6 @@ function recordMP4(progressText, progressBar) {
       const W = state.canvasW % 2 === 0 ? state.canvasW : state.canvasW + 1;
       const H = state.canvasH % 2 === 0 ? state.canvasH : state.canvasH + 1;
 
-      const target = new ArrayBufferTarget();
-      const muxer  = new Muxer({
-        target,
-        video: { codec: 'avc', width: W, height: H },
-        fastStart: 'in-memory',
-      });
-
       // H.264 High Profile (4.2) supports up to 2048×1080 in hardware.
       // For 1080p+ we use High Profile level 5.1 with preferSoftware to
       // avoid GPU encoder resolution caps that silently corrupt output.
@@ -9896,8 +9911,10 @@ function recordMP4(progressText, progressBar) {
       try { support = await VideoEncoder.isConfigSupported(encoderConfig); }
       catch(e) { support = { supported: false }; }
 
+      let videoCodec = 'avc';
       if (!support.supported) {
         // Final fallback: VP9 which has no hardware resolution cap issues
+        videoCodec = 'vp9';
         encoderConfig = {
           codec:       'vp09.00.51.08',   // VP9 Profile 0 Level 5.1
           width:       W,
@@ -9906,9 +9923,23 @@ function recordMP4(progressText, progressBar) {
           framerate:   FPS,
           latencyMode: 'quality',
         };
-        // Update muxer codec too
-        muxer._config = muxer._config || {};
       }
+
+      // Muxer created AFTER the codec decision — the container must declare
+      // the same codec the encoder actually emits
+      const hasAudio = !!(AudioEngine.voiceBuf || AudioEngine.musicBuf);
+      const target = new ArrayBufferTarget();
+      const muxer  = new Muxer({
+        target,
+        video: { codec: videoCodec, width: W, height: H },
+        ...(hasAudio ? { audio: { codec: 'aac', numberOfChannels: 2,
+                                  sampleRate: AudioEngine.ensureCtx().sampleRate } } : {}),
+        fastStart: 'in-memory',
+        // H.264 encoders emit the first chunk with a small DTS offset (e.g.
+        // 12.5ms). The strict default rejects it AND drops the decoder config,
+        // which then crashes finalize — 'offset' re-bases the track to 0.
+        firstTimestampBehavior: 'offset',
+      });
 
       const videoEncoder = new VideoEncoder({
         output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -9924,36 +9955,41 @@ function recordMP4(progressText, progressBar) {
       const mainCvs = document.getElementById('main-canvas');
 
       state.recording = true;
-      let frameCount   = 0;
       let rafId        = null;
       let encodingDone = false;
+      let lastFrameTs  = 0;              // last encoded frame's timestamp (µs)
+
+      // tap the mixed audio (voiceover + music + pen) for the file's audio track
+      if (hasAudio) { try { AudioEngine.beginExportTap(); } catch (e) {} }
 
       progressText.textContent = 'Encoding MP4…';
       progressBar.style.width  = '0%';
 
       restartAnim();
 
+      // Capture on real 30fps slots with REAL-TIME timestamps: rAF fires at the
+      // display's rate (often 60Hz), and skipped frames under encoder
+      // back-pressure must not shift later timestamps — both would desync the
+      // video clock from the audio track.
+      const t0 = performance.now();
+      let lastSlot = -1;
       function captureFrame() {
         if (!state.recording || encodingDone) return;
+        const slot = Math.floor((performance.now() - t0) / (1000 / FPS));
+        if (slot > lastSlot && videoEncoder.encodeQueueSize <= 12) {
+          lastSlot = slot;
+          // Draw at full even-pixel dimensions
+          rctx.clearRect(0, 0, W, H);
+          rctx.drawImage(mainCvs,   0, 0, state.canvasW, state.canvasH, 0, 0, W, H);
+          rctx.drawImage(handCanvas, 0, 0, state.canvasW, state.canvasH, 0, 0, W, H);
 
-        // Back-pressure: skip frame if encoder queue is backing up
-        if (videoEncoder.encodeQueueSize > 12) {
-          rafId = requestAnimationFrame(captureFrame);
-          return;
+          const ts       = Math.round(slot * 1_000_000 / FPS);   // microseconds, real time
+          const duration = Math.round(1_000_000 / FPS);
+          const frame    = new VideoFrame(rec, { timestamp: ts, duration });
+          videoEncoder.encode(frame, { keyFrame: slot % (FPS * 2) === 0 });
+          frame.close();
+          lastFrameTs = ts;
         }
-
-        // Draw at full even-pixel dimensions
-        rctx.clearRect(0, 0, W, H);
-        rctx.drawImage(mainCvs,   0, 0, state.canvasW, state.canvasH, 0, 0, W, H);
-        rctx.drawImage(handCanvas, 0, 0, state.canvasW, state.canvasH, 0, 0, W, H);
-
-        const ts       = Math.round((frameCount / FPS) * 1_000_000); // microseconds
-        const duration = Math.round(1_000_000 / FPS);
-        const frame    = new VideoFrame(rec, { timestamp: ts, duration });
-        videoEncoder.encode(frame, { keyFrame: frameCount % (FPS * 2) === 0 });
-        frame.close();
-        frameCount++;
-
         rafId = requestAnimationFrame(captureFrame);
       }
       rafId = requestAnimationFrame(captureFrame);
@@ -9977,8 +10013,46 @@ function recordMP4(progressText, progressBar) {
           setTimeout(async () => {
             try {
               await videoEncoder.flush();
-              muxer.finalize();
               videoEncoder.close();
+
+              // ── Audio track: encode the captured real-time mix as AAC ──
+              try {
+                // trim the tail to the video's last frame (+ a small tail)
+                const abuf = AudioEngine.endExportTap(lastFrameTs / 1e6 + 0.15);
+                if (abuf && typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined') {
+                  const aCfg = { codec: 'mp4a.40.2', sampleRate: abuf.sampleRate,
+                                 numberOfChannels: 2, bitrate: 128000 };
+                  const asup = await AudioEncoder.isConfigSupported(aCfg).catch(() => ({ supported: false }));
+                  if (asup.supported) {
+                    const aEnc = new AudioEncoder({
+                      output: (chunk, meta) => { try { muxer.addAudioChunk(chunk, meta); } catch (e) { console.warn(e); } },
+                      error:  (e) => console.warn('audio encode:', e),
+                    });
+                    aEnc.configure(aCfg);
+                    const L = abuf.getChannelData(0);
+                    const R = abuf.numberOfChannels > 1 ? abuf.getChannelData(1) : L;
+                    const CHS = 1024;                            // AAC frame size
+                    for (let off = 0; off < abuf.length; off += CHS) {
+                      const len  = Math.min(CHS, abuf.length - off);
+                      const data = new Float32Array(len * 2);    // f32-planar: all L, then all R
+                      data.set(L.subarray(off, off + len), 0);
+                      data.set(R.subarray(off, off + len), len);
+                      aEnc.encode(new AudioData({
+                        format: 'f32-planar',
+                        sampleRate: abuf.sampleRate,
+                        numberOfFrames: len,
+                        numberOfChannels: 2,
+                        timestamp: Math.round((off / abuf.sampleRate) * 1_000_000),
+                        data,
+                      }));
+                    }
+                    await aEnc.flush();
+                    aEnc.close();
+                  }
+                }
+              } catch (audErr) { console.warn('audio mux skipped:', audErr); }
+
+              muxer.finalize();
 
               progressBar.style.width = '100%';
 
@@ -10000,6 +10074,7 @@ function recordMP4(progressText, progressBar) {
 
     } catch (err) {
       state.recording = false;
+      try { AudioEngine.endExportTap(0); } catch (e) {}
       reject(err);
     }
   });
@@ -11678,6 +11753,67 @@ const AudioEngine = {
     try { if (this._writingSrc) { this._writingSrc.stop(); this._writingSrc = null; } } catch (e) {}
     clearTimeout(this._writeWatchdog);
     this._lastTip = null;
+  },
+
+  // ── Export audio tap ──
+  // During video export the mixed output (voiceover + music + pen writing) is
+  // tapped in real time: WebM adds the live stream track to its recorder, MP4
+  // collects the raw samples and encodes them into the file afterwards.
+  _exportDest: null,
+  _exportTap: null,
+  _exportTapping: false,
+  _exportBuf: [],
+
+  beginExportTap() {
+    const actx = this.ensureCtx();
+    try { this.applyEntryVols(); } catch (e) {}
+    if (!this._exportTap) {
+      this._exportTap = actx.createScriptProcessor(4096, 2, 2);
+      this._exportTap.onaudioprocess = e => {
+        if (!this._exportTapping) return;
+        this._exportBuf.push([
+          new Float32Array(e.inputBuffer.getChannelData(0)),
+          new Float32Array(e.inputBuffer.getChannelData(1)),
+        ]);
+      };
+    }
+    if (!this._exportDest) this._exportDest = actx.createMediaStreamDestination();
+    this._exportBuf = [];
+    this._exportTapping = true;
+    // route the mix through the tap into the export destination (speakers keep playing)
+    try { this.voiceGain.connect(this._exportTap); } catch (e) {}
+    try { this.musicGain.connect(this._exportTap); } catch (e) {}
+    try { if (this._writingGain) this._writingGain.connect(this._exportTap); } catch (e) {}
+    try { this._exportTap.connect(this._exportDest); } catch (e) {}
+    return this._exportDest.stream;
+  },
+
+  // Stop the tap and assemble the captured mix as an AudioBuffer.
+  // maxSeconds trims the tail (video stops at the last encoded frame).
+  endExportTap(maxSeconds) {
+    this._exportTapping = false;
+    try { this.voiceGain.disconnect(this._exportTap); } catch (e) {}
+    try { this.musicGain.disconnect(this._exportTap); } catch (e) {}
+    try { if (this._writingGain) this._writingGain.disconnect(this._exportTap); } catch (e) {}
+    try { this._exportTap.disconnect(); } catch (e) {}
+    const frames = this._exportBuf;
+    this._exportBuf = [];
+    if (!frames.length || !this.actx) return null;
+    const sr   = this.actx.sampleRate;
+    let n = frames.length * 4096;
+    if (maxSeconds > 0) n = Math.min(n, Math.ceil(maxSeconds * sr));
+    if (n <= 0) return null;
+    const buf = this.actx.createBuffer(2, n, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const dst = buf.getChannelData(ch);
+      let o = 0;
+      for (const fr of frames) {
+        if (o >= n) break;
+        dst.set(fr[ch].subarray(0, Math.min(4096, n - o)), o);
+        o += 4096;
+      }
+    }
+    return buf;
   },
 };
 // Persisted scribble preference (default ON)
