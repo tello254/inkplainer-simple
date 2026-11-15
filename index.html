@@ -539,8 +539,8 @@ body {
    SIDEBARS (shared)
 ═══════════════════════════════════════════ */
 #sidebar {
-  width: 262px;
-  min-width: 262px;
+  width: 280px;
+  min-width: 280px;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
   display: flex;
@@ -4300,7 +4300,7 @@ input[type="number"]:focus { border-color: var(--accent); }
 
   <div id="layer-list-empty">
     <span class="empty-arrow">↑</span>
-    Drop images above to begin
+    Add files in Files → press Use → they appear here
   </div>
   <div id="layer-list"></div>
 
@@ -12100,6 +12100,25 @@ function reorganizeSidebar() {
     bgSection.style.display = '';
     bgSection.style.marginTop = '0';
     bgSlot.appendChild(bgSection);
+  }
+
+  // 7. Workspace Manager = the Layers card (Crop/Slice/Group + list) moved in
+  //    from the right panel; the right panel is retired entirely so the
+  //    canvas preview gets the full width.
+  const wmBody = $('wm-body');
+  const rp = $('right-panel');
+  if (wmBody && rp && !wmBody.dataset.layersMoved) {
+    wmBody.dataset.layersMoved = '1';
+    const inputCard = rp.querySelector('.input-card');
+    const lph = rp.querySelector('.layer-panel-header');
+    const lle = $('layer-list-empty');
+    const ll = $('layer-list');
+    if (inputCard) wmBody.appendChild(inputCard);
+    if (lph) { lph.style.marginTop = '10px'; wmBody.appendChild(lph); }
+    if (lle) wmBody.appendChild(lle);
+    if (ll) wmBody.appendChild(ll);
+    // retire the right panel — canvas takes its space
+    rp.style.display = 'none';
   }
 }
 try { reorganizeSidebar(); } catch (e) {}
