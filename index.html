@@ -1853,13 +1853,13 @@ input[type="number"]:focus { border-color: var(--accent); }
 #canvas-area {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;      /* board touches the upper frame */
   justify-content: center;
   background: var(--bg);
   background-image: radial-gradient(circle, rgba(0,0,0,0.07) 1px, transparent 1px);
   background-size: 24px 24px;
   position: relative;
-  padding: 20px;
+  padding: 0;                   /* no padding — max room for the growing rows */
   min-height: 0;
 }
 
@@ -4584,6 +4584,17 @@ function saveProject(projectId = currentProjectId) {
           })),
           audioOwner: FilesLib._audioOwner || { voiceover: null, music: null, recording: null },
         } : { entries: [], audioOwner: null },
+
+        // Timeline layout — user rows (＋) and the full cut arrangement survive reloads
+        timeline: (typeof Workspace !== 'undefined') ? {
+          imgRows: Workspace.imgRows,
+          extraRows: { voice: Workspace.extraRows.voice, record: Workspace.extraRows.record, music: Workspace.extraRows.music },
+          cutId: Workspace.cutId,
+          cuts: Workspace.cuts.map(c => ({
+            id: c.id, kind: c.kind, layerId: c.layerId ?? null, name: c.name,
+            start: c.start, dur: c.dur, row: c.row, _moved: !!c._moved, seq: c.seq ?? null,
+          })),
+        } : null,
         
         // Animation settings
         animStyle: state.animStyle,
@@ -4720,6 +4731,22 @@ function loadProject(projectId) {
       
       // Restore layers with images
       state.layers = [];
+      // Restore the timeline layout (user rows + cut arrangement) — validated
+      // against the SAVED layer ids since live layers load asynchronously
+      try {
+        Workspace._restoring = true;
+        const tl = savedState.timeline;
+        if (tl) {
+          Workspace.imgRows = Math.max(1, tl.imgRows || 1);
+          Workspace.extraRows = { voice: 0, record: 0, music: 0, ...(tl.extraRows || {}) };
+          Workspace.cutId = Math.max(1, tl.cutId || 1);
+          if (Array.isArray(tl.cuts)) {
+            const savedLayerIds = new Set((savedState.layers || []).map(l => l.id));
+            Workspace.cuts = tl.cuts.filter(c =>
+              c.kind !== 'image' || (c.layerId != null && savedLayerIds.has(c.layerId)));
+          }
+        }
+      } catch (e) { try { Workspace._restoring = false; } catch (e2) {} }
       if (savedState.layers && savedState.layers.length > 0) {
         // CRITICAL: Set the layer ID counter BEFORE loading to avoid conflicts when adding new layers
         const maxId = Math.max(...savedState.layers.map(l => l.id));
@@ -4776,6 +4803,7 @@ function loadProject(projectId) {
               
               if (loadedCount === totalLayers) {
                 // All layers loaded - restore visual stack order (savedIndex = position in state.layers at save time)
+                Workspace._restoring = false;
                 state.layers.sort((a, b) => (a._savedIndex ?? 0) - (b._savedIndex ?? 0));
                 // Clean up temp sort key
                 state.layers.forEach(l => delete l._savedIndex);
@@ -4794,6 +4822,7 @@ function loadProject(projectId) {
               console.error('Failed to load layer image');
               loadedCount++;
               if (loadedCount === totalLayers) {
+                Workspace._restoring = false;
                 renderLayerList();
                 redrawLayersOnCanvas();
               }
@@ -4802,6 +4831,7 @@ function loadProject(projectId) {
           } else {
             loadedCount++;
             if (loadedCount === totalLayers) {
+              Workspace._restoring = false;
               renderLayerList();
               redrawLayersOnCanvas();
             }
@@ -4809,6 +4839,7 @@ function loadProject(projectId) {
         });
       } else {
         // No layers - clear layer list
+        Workspace._restoring = false;
         renderLayerList();
         redrawLayersOnCanvas();
       }
@@ -6024,7 +6055,7 @@ function fitCanvas() {
   const styles = getComputedStyle(canvasArea);
   const padX = parseFloat(styles.paddingLeft || '0') + parseFloat(styles.paddingRight || '0');
   const padY = parseFloat(styles.paddingTop || '0') + parseFloat(styles.paddingBottom || '0');
-  const safeMargin = 24;
+  const safeMargin = 8;
   const availableW = Math.max(160, canvasArea.clientWidth - padX - safeMargin);
   const availableH = Math.max(160, canvasArea.clientHeight - padY - safeMargin);
   const s = Math.min(availableW/state.canvasW, availableH/state.canvasH, 1);
@@ -6648,9 +6679,12 @@ function renderLayerList() {
   empty.style.display = 'none';   // retired empty-state hint (kept for compat)
   try {
     // keep timeline cuts in sync with the layer set (rebuild on add/remove/restore)
-    const imgCutIds = Workspace.cuts.filter(c => c.kind === 'image').map(c => c.layerId).sort().join(',');
-    const layerIds = state.layers.map(l => l.id).sort().join(',');
-    if (imgCutIds !== layerIds) Workspace.rebuildFromLayers();
+    // — never during project load: restored cuts must survive interim renders
+    if (!Workspace._restoring) {
+      const imgCutIds = Workspace.cuts.filter(c => c.kind === 'image').map(c => c.layerId).sort().join(',');
+      const layerIds = state.layers.map(l => l.id).sort().join(',');
+      if (imgCutIds !== layerIds) Workspace.rebuildFromLayers();
+    }
     Workspace.render(); FilesLib.render();
   } catch (e) {}
 
@@ -11926,8 +11960,9 @@ const Workspace = {
 
   // ── Build cuts from layers, TO SCALE ──
   // Groups = same animOrder (parallel). Group starts are cumulative; within a
-  // group every layer starts together (extra layers go on extra rows).
-  // Real measured durations (from the last Generate) are used when present.
+  // group every layer starts together.
+  // User-declared rows are RESPECTED: ＋ rows are permanent — image rows only
+  // ever grow (auto-add a lane when cuts don't fit), never shrink back.
   rebuildFromLayers() {
     const old = new Map(this.cuts.filter(c => c.kind === 'image').map(c => [c.layerId, c]));
     const seq = this.orderSeq();
@@ -11939,17 +11974,35 @@ const Workspace = {
       g.layers.push(l);
     });
 
+    // track which time intervals each image row already carries
+    const usedRows = new Map();          // row -> [[start,end), ...]
+    const claim = (row, s, e) => {
+      if (!usedRows.has(row)) usedRows.set(row, []);
+      usedRows.get(row).push([s, e]);
+    };
+    const isFree = (row, s, e) => !(usedRows.get(row) || []).some(([a, b]) => s < b && e > a);
+
     const cuts = [];
     let t = 0;
-    let extraRows = 0;
     groups.forEach(g => {
       const durs = g.layers.map(l => l._measuredDur || old.get(l.id)?.dur || 4);
       g.layers.forEach((l, i) => {
         const prev = old.get(l.id);
         const moved = prev?._moved;
-        const row = i === 0 ? 0 : (prev?.row || (1 + extraRows++));
         const dur = Math.max(0.3, durs[i]);
         const start = moved && prev ? prev.start : t;
+        // row choice: moved cuts keep their row; others take the first free
+        // image row (row 0 preferred for the group's lead cut)
+        let row = -1;
+        if (moved && prev && (prev.row ?? 0) < this.imgRows && isFree(prev.row ?? 0, start, start + dur)) {
+          row = prev.row ?? 0;
+        } else {
+          for (let r = 0; r < this.imgRows; r++) {
+            if (isFree(r, start, start + dur)) { row = r; break; }
+          }
+        }
+        if (row === -1) { row = this.imgRows; this.imgRows++; }   // grow a lane
+        claim(row, start, start + dur);
         cuts.push({
           id: prev?.id || this.cutId++, kind: 'image', layerId: l.id, name: l.name,
           start, dur, row, _moved: !!moved,
@@ -11959,8 +12012,6 @@ const Workspace = {
     });
     // keep audio cuts (voice/record/music) as-is
     const audio = this.cuts.filter(c => c.kind !== 'image');
-    // image rows needed = 1 + parallel count
-    this.imgRows = Math.max(1, 1 + extraRows);
     this.cuts = [...cuts, ...audio];
     this._ensureAudioRows();
     this.syncAnimOrder();
@@ -12001,16 +12052,23 @@ const Workspace = {
 
   _ensureAudioRows() {
     // audio cuts live in category bands below the image rows:
-    // voiceover first, then recording, then background music
-    const nVoice = this.cuts.filter(c => c.kind === 'voice').length  + this.extraRows.voice;
-    const nRec   = this.cuts.filter(c => c.kind === 'record').length + this.extraRows.record;
+    // voiceover first, then recording, then background music.
+    // Cuts already inside their band keep their row (user-dragged positions
+    // are respected); only out-of-band cuts get re-homed into free band rows.
     let base = this.imgRows;
     ['voice', 'record', 'music'].forEach(kind => {
-      const n = kind === 'voice' ? nVoice : kind === 'record' ? nRec
-              : this.cuts.filter(c => c.kind === 'music').length + this.extraRows.music;
-      this.cuts.filter(c => c.kind === kind)
-        .sort((a, b) => (a.row ?? 999) - (b.row ?? 999))
-        .forEach((c, i) => { c.row = base + i; });
+      const mine = this.cuts.filter(c => c.kind === kind);
+      const n = mine.length + this.extraRows[kind === 'voice' ? 'voice' : kind === 'record' ? 'record' : 'music'];
+      const inBand = mine.filter(c => (c.row ?? -1) >= base && (c.row ?? -1) < base + n);
+      const taken = new Set(inBand.map(c => c.row));
+      const strays = mine.filter(c => !inBand.includes(c))
+        .sort((a, b) => (a.row ?? 999) - (b.row ?? 999));
+      let r = base;
+      strays.forEach(c => {
+        while (taken.has(r) && r < base + n) r++;
+        if (r >= base + n) r = base + n - 1;          // band overflow safeguard
+        c.row = r; taken.add(r); r++;
+      });
       base += n;
     });
   },
@@ -12134,6 +12192,7 @@ const Workspace = {
       // shift rows below r up by one
       this.cuts.forEach(c => { if ((c.row ?? 0) > r) c.row--; });
       if (info.cat === 'image') this.imgRows--; else this.extraRows[info.cat]--;
+      this._ensureAudioRows();          // re-seat audio cuts into their (shifted) bands
       this.render(); this.renderWM();
     });
 
@@ -12276,6 +12335,7 @@ const Workspace = {
         const cat = o.dataset.cat;
         if (cat === 'image') this.imgRows++; else this.extraRows[cat]++;
         menu.remove();
+        this._ensureAudioRows();      // re-seat audio cuts into their (shifted) bands
         this.render();
       };
     });
