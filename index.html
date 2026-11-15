@@ -6435,6 +6435,8 @@ function _runGroupAt(gpos) {
       const prev = state._animGroups[gpos - 1] || [];
       const ds = prev.map(l => l._measuredDur || 0).filter(x => x > 0);
       if (ds.length) state._groupDurs[gpos - 1] = Math.max(...ds);
+      // keep the timeline cards in sync with real durations as they arrive
+      try { if (typeof Workspace !== 'undefined' && Workspace.applyMeasuredDurs) Workspace.applyMeasuredDurs(); } catch (e) {}
     }
     state._groupT0 = performance.now();
   } catch (e) {}
@@ -6566,6 +6568,7 @@ function _allLayersDone() {
     const cur = (state._animGroups || [])[gpos] || [];
     const ds = cur.map(l => l._measuredDur || 0).filter(x => x > 0);
     if (ds.length) state._groupDurs[gpos] = Math.max(...ds);
+    try { if (typeof Workspace !== 'undefined' && Workspace.applyMeasuredDurs) Workspace.applyMeasuredDurs(); } catch (e) {}
   } catch (e) {}
   state._activeSlots  = [];
   state._currentSlot  = null;
@@ -9100,8 +9103,8 @@ function setProgress(ratio) {
   state._animProgress = Math.min(ratio, 1);
   const pct=Math.round(state._animProgress*100);
   document.getElementById('progress-fill').style.width=pct+'%';
-  document.getElementById('time-display').textContent=pct+'%';
-  try { Workspace.setPlayhead(Math.min(ratio, 1)); } catch (e) {}
+  // time-display shows the TIMELINE clock (m:ss, owned by the playhead) —
+  // writing scene progress % here fought with it every frame
 }
 
 function animate() {
@@ -9181,6 +9184,8 @@ function resetAnim() {
 }
 
 function restartAnim() {
+  // full replay from zero — forget any playhead origin
+  try { if (typeof Workspace !== 'undefined') { Workspace._playOriginG = null; Workspace._playOriginT = null; } } catch (e) {}
   if (state.layers.length > 0) { generate(); return; }
   if (!offscreen) return;
   resetAnim(); setupStyle(); startAnim();
@@ -12393,6 +12398,10 @@ const Workspace = {
     AudioEngine.stopPreview();
     AudioEngine._previewOffset = t;
     AudioEngine.startPreview(t);
+    // remember where playback began so the playhead continues from HERE
+    // (not from 0) while scenes animate
+    this._playOriginT = t;
+    this._playOriginG = gpos;
     state.playing = true;
     updatePlayIcons();
     window._runGroupAt(gpos);
@@ -12448,7 +12457,10 @@ const Workspace = {
     if (ph) ph.style.left = (this.playT * this.PXS) + 'px';
   },
 
-  // Per-frame during playback: real engine time → playhead (to scale)
+  // Per-frame during playback: real engine time → playhead (to scale).
+  // When playback started at the playhead, the origin is added so the play
+  // line continues from where the user set it, not from 0. Unmeasured group
+  // durations fall back to their cut's dur (not a blind 4s).
   syncPlayback() {
     if (state.done) {
       // once finished: rebuild widths from the fresh measured durations, snap playhead to end
@@ -12463,10 +12475,42 @@ const Workspace = {
     if (!state.playing) return;
     const durs = state._groupDurs || [];
     const gpos = state._groupPos ?? 0;
-    let t = 0;
-    for (let g = 0; g < gpos; g++) t += durs[g] || 4;
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
+                          .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+    const durOf = g => (durs[g] || (row0[g] && row0[g].dur) || 4);
+    let t;
+    if (this._playOriginG != null && this._playOriginT != null && gpos >= this._playOriginG) {
+      t = this._playOriginT;
+      for (let g = this._playOriginG; g < gpos; g++) t += durOf(g);
+    } else {
+      t = 0;
+      for (let g = 0; g < gpos; g++) t += durOf(g);
+    }
     t += (performance.now() - (state._groupT0 || performance.now())) / 1000;
     this.setPlayheadTime(t);
+  },
+
+  // Write real measured group durations back into the cuts while playing, so
+  // the timeline cards match what the engine actually animates (a scene that
+  // takes 6s shows a 6s card, not the 4s guess).
+  applyMeasuredDurs() {
+    const durs = state._groupDurs || [];
+    if (!durs.some(d => d > 0)) return;
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
+                          .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+    let dirty = false;
+    row0.forEach((c, i) => {
+      const d = durs[i];
+      if (d > 0 && Math.abs((c.dur || 0) - d) > 0.05) { c.dur = Math.max(0.3, d); dirty = true; }
+    });
+    if (!dirty) return;
+    // re-flow the starts of cuts the user hasn't moved (moved cuts stay put)
+    let t = 0;
+    row0.forEach(c => {
+      if (!c._moved) c.start = t;
+      t += c.dur;
+    });
+    this.render();
   },
 
   // Drop a new layer into the sequence at the playhead: it joins the group of
