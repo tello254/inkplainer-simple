@@ -4106,6 +4106,13 @@ input[type="number"]:focus { border-color: var(--accent); }
         pointer-events:none; box-shadow:0 0 6px var(--accent2); }
       #tl-playhead::before { content:''; position:absolute; top:0; left:-4px; border:5px solid transparent;
         border-top-color:var(--accent2); }
+      /* elah island mount — active once the React timeline loads */
+      #elah-mount { position:absolute; inset:0; z-index:5; display:none; }
+      #timeline.elah-on #elah-mount { display:block; }
+      #timeline.elah-on #tl-ruler,
+      #timeline.elah-on #tl-rows,
+      #timeline.elah-on #tl-empty,
+      #timeline.elah-on #tl-playhead { display:none !important; }
       #tl-empty { position:absolute; top:30px; left:16px; font-size:10px; color:var(--muted); }
       /* Slim playbar capsule */
       #playbar { padding:4px 12px; min-width:240px; gap:8px; bottom:158px; }
@@ -4122,9 +4129,12 @@ input[type="number"]:focus { border-color: var(--accent); }
           <div id="tl-rows"></div>
           <div id="tl-empty">Add images in Files → press Use → they appear here as cuts</div>
           <div id="tl-playhead" style="left:0"></div>
+          <div id="elah-mount"></div>
         </div>
       </div>
     </div>
+    <link rel="stylesheet" href="./timeline-dist/timeline-app.css">
+    <script type="module" src="./timeline-dist/timeline-app.js"></script>
     <script>
       // keep slim playbar above the timeline
       (function () {
@@ -4605,6 +4615,7 @@ function saveProject(projectId = currentProjectId) {
           cuts: Workspace.cuts.map(c => ({
             id: c.id, kind: c.kind, layerId: c.layerId ?? null, name: c.name,
             start: c.start, dur: c.dur, row: c.row, _moved: !!c._moved, seq: c.seq ?? null,
+            _splitHalf: !!c._splitHalf || undefined, _splitScene: !!c._splitScene || undefined,
           })),
         } : null,
         
@@ -4901,7 +4912,11 @@ function loadProject(projectId) {
         });
         Workspace.render();
       } catch (e) {}
-      
+
+      // the elah island needs the restored arrangement; audio re-decodes and
+      // image loads land asynchronously, so sync a few times as things settle
+      [600, 1800, 4000].forEach(ms => setTimeout(() => { try { Workspace.syncIsland(); } catch (e) {} }, ms));
+
       // Update topbar displays
       const sizeDisplay = document.getElementById('topbar-size-display');
       if (sizeDisplay) {
@@ -9038,6 +9053,7 @@ function _commitTextLayer(text) {
       try { Workspace.placeLayerAtPlayhead(layer); } catch (e) {}
     }
     measureLayerDuration(layer);   // true drawing length → correct cut length
+    try { Workspace.rebuildFromLayers(); Workspace.syncIsland(); } catch (e) {}
     renderLayerList();
     selectLayer(id);
     redrawLayersOnCanvas();
@@ -11856,18 +11872,48 @@ const AudioEngine = {
     if (!this.voiceBuf && !this.musicBuf) return;
     const actx = this.ensureCtx();
     try { this.applyEntryVols(); } catch (e) {}
-    if (this.voiceBuf) {
-      this._voiceSrc = actx.createBufferSource();
-      this._voiceSrc.buffer = this.voiceBuf;
-      this._voiceSrc.connect(this.voiceGain);
-      this._voiceSrc.start(0, Math.min(offset, this.voiceBuf.duration));
-    }
-    if (this.musicBuf) {
-      this._musicSrc = actx.createBufferSource();
-      this._musicSrc.buffer = this.musicBuf;
-      this._musicSrc.loop = true;
-      this._musicSrc.connect(this.musicGain);
-      this._musicSrc.start(0, Math.min(offset, this.musicBuf.duration));
+    // TRUE timeline windows: each audio cut plays exactly its own span
+    // (respecting trim in-points), not the whole buffer from the playhead.
+    // The export tap records this live scheduling, so exports match too.
+    const playT = Math.max(0, offset);
+    this._cutSrcs = [];
+    const sched = (buf, gain, kinds) => {
+      if (!buf || !gain || typeof Workspace === 'undefined') return;
+      for (const c of Workspace.cuts) {
+        if (!kinds.includes(c.kind)) continue;
+        const cs = c.start || 0, cd = c.dur || buf.duration, cin = c.in || 0;
+        if (playT >= cs + cd - 0.01) continue;          // cut already over
+        const srcOffset = cin + Math.max(0, playT - cs);
+        const loops = c.kind === 'music' && cd - (playT - cs) > buf.duration - srcOffset;
+        if (!loops && srcOffset >= buf.duration - 0.01) continue;
+        const src = actx.createBufferSource();
+        src.buffer = buf;
+        src.connect(gain);
+        if (loops) src.loop = true;
+        const when = actx.currentTime + Math.max(0, cs - playT);
+        try {
+          src.start(when, loops ? (srcOffset % buf.duration) : Math.min(srcOffset, buf.duration - 0.01));
+          this._cutSrcs.push(src);
+        } catch (e) {}
+      }
+    };
+    sched(this.voiceBuf, this.voiceGain, ['voice', 'record']);
+    sched(this.musicBuf, this.musicGain, ['music']);
+    // legacy behavior when no cuts exist at all: play the buffers plainly
+    if (!this._cutSrcs.length && !(typeof Workspace !== 'undefined' && Workspace.cuts.some(c => c.kind !== 'image'))) {
+      if (this.voiceBuf) {
+        this._voiceSrc = actx.createBufferSource();
+        this._voiceSrc.buffer = this.voiceBuf;
+        this._voiceSrc.connect(this.voiceGain);
+        this._voiceSrc.start(0, Math.min(offset, this.voiceBuf.duration));
+      }
+      if (this.musicBuf) {
+        this._musicSrc = actx.createBufferSource();
+        this._musicSrc.buffer = this.musicBuf;
+        this._musicSrc.loop = true;
+        this._musicSrc.connect(this.musicGain);
+        this._musicSrc.start(0, Math.min(offset, this.musicBuf.duration));
+      }
     }
     this._previewStartedAt = performance.now();
   },
@@ -11883,6 +11929,9 @@ const AudioEngine = {
     }
     try { if (this._voiceSrc) { this._voiceSrc.stop(); this._voiceSrc = null; } } catch (e) {}
     try { if (this._musicSrc) { this._musicSrc.stop(); this._musicSrc = null; } } catch (e) {}
+    // per-cut sources scheduled by the windowed preview must stop too
+    const cuts = this._cutSrcs; this._cutSrcs = [];
+    if (cuts) for (const s of cuts) { try { s.stop(); } catch (e) {} }
     this._writingActive = false;
     if (this._writingGain && this.actx) this._writingGain.gain.value = 0;
     try { if (this._writingSrc) { this._writingSrc.stop(); this._writingSrc = null; } } catch (e) {}
@@ -12140,7 +12189,7 @@ const FilesLib = {
           m.linkedLayerId = layer.id;
           measureLayerDuration(layer);     // real animation length → cut length
         }
-        if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); }
+        if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); try { Workspace.syncIsland(); } catch (e) {} }
       };
       img.onerror = () => { if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); } };
       img.src = m.dataURL;
@@ -12335,7 +12384,13 @@ const Workspace = {
   // User-declared rows are RESPECTED: ＋ rows are permanent — image rows only
   // ever grow (auto-add a lane when cuts don't fit), never shrink back.
   rebuildFromLayers() {
-    const old = new Map(this.cuts.filter(c => c.kind === 'image').map(c => [c.layerId, c]));
+    const oldAll = new Map();          // layerId -> [image cuts sorted by start] (split halves share a layer)
+    this.cuts.filter(c => c.kind === 'image').forEach(c => {
+      if (!oldAll.has(c.layerId)) oldAll.set(c.layerId, []);
+      oldAll.get(c.layerId).push(c);
+    });
+    for (const arr of oldAll.values()) arr.sort((a, b) => a.start - b.start);
+    const old = new Map([...oldAll].map(([k, v]) => [k, v[0]]));   // lead cut per layer
     const seq = this.orderSeq();
     const groups = [];
     seq.forEach(l => {
@@ -12357,6 +12412,7 @@ const Workspace = {
     let t = 0;
     groups.forEach(g => {
       const durs = g.layers.map(l => l._measuredDur || old.get(l.id)?.dur || 4);
+      let gEnd = t + Math.max(...durs);
       g.layers.forEach((l, i) => {
         const prev = old.get(l.id);
         const moved = prev?._moved;
@@ -12378,14 +12434,25 @@ const Workspace = {
           id: prev?.id || this.cutId++, kind: 'image', layerId: l.id, name: l.name,
           start, dur, row, _moved: !!moved,
         });
+        // keep the split halves of this scene (same layer, user-carved span)
+        const olds = oldAll.get(l.id) || [];
+        const leadCut = cuts[cuts.length - 1];
+        if (olds.length > 1) leadCut._splitScene = true;   // measurement leaves it alone
+        for (const half of olds.slice(1)) {
+          const hr = Math.min(half.row ?? 0, this.imgRows - 1);
+          claim(hr, half.start, half.start + half.dur);
+          cuts.push({ ...half, row: hr, _moved: true });
+          gEnd = Math.max(gEnd, half.start + half.dur);
+        }
       });
-      t += Math.max(...durs);
+      t = Math.max(t + Math.max(...durs), gEnd);
     });
     // keep audio cuts (voice/record/music) as-is
     const audio = this.cuts.filter(c => c.kind !== 'image');
     this.cuts = [...cuts, ...audio];
     this._ensureAudioRows();
     this.syncAnimOrder();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   ensureVoiceCut(name) {
@@ -12397,6 +12464,7 @@ const Workspace = {
       v.dur = AudioEngine.voiceBuf.duration;
     }
     this._ensureAudioRows();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   ensureRecCut(name) {
@@ -12408,6 +12476,7 @@ const Workspace = {
       rc.dur = AudioEngine.voiceBuf.duration;
     }
     this._ensureAudioRows();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   ensureMusicCut() {
@@ -12419,6 +12488,7 @@ const Workspace = {
       m.dur = AudioEngine.musicBuf.duration;
     }
     this._ensureAudioRows();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   _ensureAudioRows() {
@@ -12476,10 +12546,24 @@ const Workspace = {
   // (rows > 0) join the group of the row-0 cut they overlap.
   syncAnimOrder() {
     const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+    // split halves ride with their lead scene (same layer) — number scenes, not cuts
+    const halves = new Set();
     row0.forEach((c, i) => {
-      c.seq = i + 1;
+      if (c._splitHalf || row0.some((x, j) => j < i && x.layerId === c.layerId)) halves.add(c.id);
+    });
+    let n = 0;
+    row0.forEach(c => {
+      if (halves.has(c.id)) return;
+      n++;
+      c.seq = n;
       const l = state.layers.find(x => x.id === c.layerId);
-      if (l) l.animOrder = i + 1;
+      if (l) l.animOrder = n;
+    });
+    row0.filter(c => halves.has(c.id)).forEach(c => {
+      const lead = row0.find(x => !halves.has(x.id) && x.layerId === c.layerId);
+      if (lead) c.seq = lead.seq;
+      const l = state.layers.find(x => x.id === c.layerId);
+      if (lead && l) l.animOrder = lead.seq;
     });
     this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) > 0).forEach(c => {
       const host = row0.find(r => c.start >= r.start && c.start < r.start + r.dur) || row0[row0.length - 1];
@@ -12487,7 +12571,7 @@ const Workspace = {
       if (l && host) l.animOrder = host.seq;
     });
     // keep layer stack in timeline order
-    const ordered = row0.map(c => state.layers.find(x => x.id === c.layerId)).filter(Boolean);
+    const ordered = row0.filter(c => !halves.has(c.id)).map(c => state.layers.find(x => x.id === c.layerId)).filter(Boolean);
     const parallel = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) > 0)
       .map(c => state.layers.find(x => x.id === c.layerId)).filter(Boolean);
     if (ordered.length) {
@@ -12825,6 +12909,8 @@ const Workspace = {
     this._placePlayhead();
     const td = document.getElementById('time-display');
     if (td) td.textContent = this._fmt(this.playT);
+    // drive the elah island's playhead (playback clock is ours)
+    try { if (window.__elahPush && window.__elahReady) window.__elahPush.seek(this.playT); } catch (e) {}
     // the board is a live frame-at-the-playline preview when not playing
     if (!state.playing && typeof redrawLayersOnCanvas === 'function') {
       try { redrawLayersOnCanvas(); } catch (e) {}
@@ -12865,8 +12951,13 @@ const Workspace = {
     const durs = state._groupDurs || [];
     const gpos = state._groupPos ?? 0;
     const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
-                          .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
-    const durOf = g => (durs[g] || (row0[g] && row0[g].dur) || 4);
+                          .sort((a, b) => ((a.seq ?? 0) - (b.seq ?? 0)) || ((a.start ?? 0) - (b.start ?? 0)));
+    // a split scene owns several cuts — its timeline span is the sum of them
+    const durOf = g => {
+      const halves = row0.filter(c => (c.seq ?? 0) === g + 1);
+      if (halves.length) return halves.reduce((s, c) => s + (c.dur || 0), 0) || durs[g] || 4;
+      return durs[g] || 4;
+    };
     let t;
     if (this._playOriginG != null && this._playOriginT != null && gpos >= this._playOriginG) {
       t = this._playOriginT;
@@ -12888,8 +12979,13 @@ const Workspace = {
     const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
                           .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
     let dirty = false;
+    const carved = new Set();
     row0.forEach((c, i) => {
-      const d = durs[i];
+      if (c._splitHalf || c._splitScene || row0.some((x, j) => j !== i && x.layerId === c.layerId)) carved.add(c.seq ?? 0);
+    });
+    row0.forEach((c, i) => {
+      if (carved.has(c.seq ?? 0)) return;   // split scene — the user owns its length
+      const d = durs[(c.seq ?? (i + 1)) - 1];
       if (d > 0 && Math.abs((c.dur || 0) - d) > 0.05) { c.dur = Math.max(0.3, d); dirty = true; }
     });
     if (!dirty) return;
@@ -12900,6 +12996,7 @@ const Workspace = {
       t += c.dur;
     });
     this.render();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   // Drop a new layer into the sequence at the playhead: it joins the group of
@@ -12994,9 +13091,141 @@ const Workspace = {
     }
     this.cuts = this.cuts.filter(x => x.id !== id);
     this.render(); this.renderWM();
+    try { this.syncIsland(); } catch (e) {}
   },
 
   selectAudioCut(id) { this.selId = id; this.render(); },
+
+  // ══ ELAH TIMELINE BRIDGE ══════════════════════════════════════════════════
+  // The React island (@elah/timeline) owns the strip UI; cuts[] stay the
+  // source of truth. clip ids on the island are "ref" ids = String(cut.id).
+  _cutTrack(c) {
+    if (c.kind === 'image') return (c.row ?? 0) > 0 ? `Scenes ${(c.row ?? 0) + 1}` : 'Scenes';
+    return c.kind === 'voice' ? 'Voiceover' : c.kind === 'record' ? 'Recordings' : 'Music';
+  },
+  _trackInfo(name) {
+    if (name === 'Voiceover')  return { kind: 'voice',  row: null };
+    if (name === 'Recordings') return { kind: 'record', row: null };
+    if (name === 'Music')      return { kind: 'music',  row: null };
+    if (name === 'Scenes')     return { kind: 'image',  row: 0 };
+    const m = /^Scenes (\d+)$/.exec(String(name));
+    if (m) return { kind: 'image', row: +m[1] - 1 };
+    return null;
+  },
+  stage() { return { width: state.canvasW || 1280, height: state.canvasH || 720 }; },
+  isPlaying() { return !!state.playing; },
+
+  snapshot() {
+    const tracks = [];
+    const seen = new Set();
+    for (const c of this.cuts) {
+      const n = this._cutTrack(c);
+      if (!seen.has(n)) { seen.add(n); tracks.push({ name: n, kind: n === 'Scenes' || /^Scenes \d+$/.test(n) ? 'video' : 'audio' }); }
+    }
+    const clips = this.cuts.map(c => {
+      const m = FilesLib.media.find(x => x.type === 'image' && x.linkedLayerId === c.layerId);
+      return {
+        id: String(c.id), track: this._cutTrack(c),
+        type: c.kind === 'image' ? 'image' : 'audio',
+        startSec: c.start || 0, durSec: c.dur || 4,
+        name: c.name || '', src: m ? m.dataURL : null,
+      };
+    });
+    return { tracks, clips };
+  },
+
+  // island → vanilla: timing/track/deletion edits
+  applyIsland(clips) {
+    if (this._elahResync || !Array.isArray(clips)) return;
+    try {
+      const byId = new Map(clips.map(cl => [String(cl.id), cl]));
+      const adopted = [];
+      // deletions: a clip removed on the island takes its scene/cut with it
+      for (const c of [...this.cuts]) {
+        if (!byId.has(String(c.id))) {
+          if (c.kind === 'image') {
+            this.cuts = this.cuts.filter(x => x !== c);
+            if (c._splitHalf) continue;   // a half shares the lead's layer — the cut alone goes
+            // lead removed → its split halves go too, then the layer
+            this.cuts = this.cuts.filter(x => !(x.kind === 'image' && x.layerId === c.layerId));
+            const l = state.layers.find(x => x.id === c.layerId);
+            if (l) removeLayer(l.id);
+          } else {
+            this.removeAudioCut(c.id);
+          }
+        }
+      }
+      let dirty = false;
+      for (const cl of clips) {
+        const ref = String(cl.id);
+        let c = this.cuts.find(x => String(x.id) === ref);
+        if (!c) {
+          // brand-new clip → the right half of a split: clone the cut that
+          // ends exactly where it begins, on the same track
+          const left = this.cuts.find(x => this._cutTrack(x) === cl.track &&
+            Math.abs(((x.start || 0) + (x.dur || 0)) - cl.startSec) < 0.03);
+          if (!left) continue;   // unknown origin — ignore
+          // echo-race guard: this engine clip may already have been adopted
+          const dup = this.cuts.find(x => x !== left && this._cutTrack(x) === cl.track &&
+            Math.abs((x.start || 0) - cl.startSec) < 0.03 && Math.abs((x.dur || 0) - cl.durSec) < 0.03);
+          if (dup) { adopted.push({ clipId: cl.engineId || cl.id, refId: String(dup.id) }); continue; }
+          const newId = ++this.cutId;
+          this.cutId = Math.max(this.cutId, newId);
+          c = { ...left, id: newId, start: cl.startSec, dur: cl.durSec, _moved: true, seq: left.seq, _splitHalf: true };
+          left._splitScene = true;   // scene is carved — measurement stops reflowing it
+          this.cuts.push(c);
+          adopted.push({ clipId: cl.engineId || cl.id, refId: String(newId) });
+          dirty = true;
+          continue;
+        }
+        const ns = Math.max(0, cl.startSec), nd = Math.max(0.1, cl.durSec);
+        const movedS = Math.abs(ns - (c.start || 0)) > 0.02;
+        const movedD = Math.abs(nd - (c.dur || 0)) > 0.02;
+        // left-trim on audio advances the in-point (buffer offset)
+        if (movedS && movedD && c.kind !== 'image') c.in = Math.max(0, (c.in || 0) + (ns - c.start));
+        const info = this._trackInfo(cl.track);
+        if (info && info.kind === c.kind && info.row != null && info.row !== (c.row ?? 0)) { c.row = info.row; dirty = true; }
+        if (movedS) { c.start = ns; dirty = true; }
+        if (movedD) { c.dur = nd; dirty = true; }
+        if (movedS || movedD) c._moved = true;
+      }
+      if (dirty) { this._reseqScenes(); this.render(); scheduleAutoSave(); }
+      else this._reseqScenes();
+      return adopted;
+    } catch (e) { console.error('island apply failed', e); return []; }
+  },
+
+  // keep scene numbering aligned with the actual layout after island edits
+  _reseqScenes() {
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
+                          .sort((a, b) => a.start - b.start);
+    // split halves ride with their lead scene (same layer) — don't renumber them
+    const halves = new Set();
+    row0.forEach((c, i) => {
+      if (c._splitHalf || row0.some((x, j) => j < i && x.layerId === c.layerId)) halves.add(c.id);
+    });
+    let s = 0;
+    row0.forEach(c => {
+      if (halves.has(c.id)) return;
+      s++;
+      if (c.seq !== s) { c.seq = s; const l = state.layers.find(x => x.id === c.layerId); if (l) l.animOrder = s; }
+    });
+    // extra image rows host overlays of the scene they sit inside
+    this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) > 0).forEach(c => {
+      const host = row0.find(s => c.start >= s.start - 0.05 && c.start < s.start + s.dur);
+      const l = state.layers.find(x => x.id === c.layerId);
+      if (host && l) l.animOrder = host.seq;
+    });
+  },
+
+  // vanilla → island: push the current arrangement into the React timeline
+  syncIsland() {
+    try {
+      if (!window.__elahPush || !window.__elahReady) return;
+      this._elahResync = true;
+      window.__elahPush.resync(this.snapshot());
+    } catch (e) {} finally { this._elahResync = false; }
+  },
 };
 
 // Music loads (via the Files card music button) also become red cuts
@@ -13014,6 +13243,30 @@ try {
     Workspace.render();
   };
 } catch (e) {}
+
+// ── elah island boot ──────────────────────────────────────────────────────────
+// Adapter the React island talks to (its contract expects window.__inkTimeline).
+window.__inkTimeline = {
+  snapshot: () => Workspace.snapshot(),
+  apply: (clips) => Workspace.applyIsland(clips),
+  seek: (sec) => { try { Workspace.setPlayheadTime(sec); } catch (e) {} },
+  isPlaying: () => Workspace.isPlaying(),
+  stage: () => Workspace.stage(),
+};
+
+// When the React timeline signals ready: activate it, push the current
+// arrangement, and re-sync whenever the arrangement changes from our side.
+(function () {
+  const activate = () => {
+    try {
+      document.getElementById('timeline')?.classList.add('elah-on');
+      Workspace.syncIsland();
+      try { window.__elahPush && window.__elahPush.zoomFit(); } catch (e) {}
+    } catch (e) { console.error('elah activation failed', e); }
+  };
+  if (window.__elahReady) activate();
+  else window.addEventListener('elah-ready', activate);
+})();
 
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,85 @@
+/* Deep-purple theme for the elah timeline island — overrides the --elah-* tokens
+   inside .elah-root scope only. Anything not overridden keeps the SDK default. */
+.elah-ink {
+  --elah-bg:            #0b0917;
+  --elah-bg-secondary:  #12101f;
+  --elah-bg-panel:      #171528;
+  --elah-bg-card:       #1e1b33;
+  --elah-bg-elevated:   #262343;
+
+  --elah-border:        #332e52;
+  --elah-border-subtle: #2a2647;
+
+  --elah-text:           #e8e5f5;
+  --elah-text-secondary: #b4aecf;
+  --elah-text-muted:     #7e7996;
+
+  --elah-accent:       #8b5cf6;
+  --elah-accent-hover: #a78bfa;
+  --elah-accent-text:  #f1ebff;
+
+  /* clip palettes — amber scenes, calm audio */
+  --elah-clip-video-top:    #fbbf24;
+  --elah-clip-video-mid:    #f59e0b;
+  --elah-clip-video-bottom: #b45309;
+  --elah-clip-video-accent: #241a02;
+
+  --elah-clip-audio-top:    #4ade80;
+  --elah-clip-audio-mid:    #22c55e;
+  --elah-clip-audio-bottom: #15803d;
+  --elah-clip-audio-accent: #03230f;
+
+  --elah-clip-image-top:    #4ade80;
+  --elah-clip-image-mid:    #22c55e;
+  --elah-clip-image-bottom: #15803d;
+  --elah-clip-image-accent: #03230f;
+
+  font-size: 12px;
+}
+
+/* the island fills the timeline panel area */
+#elah-mount {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  min-height: 0;
+}
+#timeline.elah-on #elah-mount { display: flex; }
+#timeline.elah-on #tl-ruler,
+#timeline.elah-on #tl-rows,
+#timeline.elah-on #tl-empty,
+#timeline.elah-on #tl-playhead { display: none !important; }
+
+.elah-ink {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  background: var(--elah-bg);
+}
+
+/* small toolbar above the tracks */
+.elah-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--elah-border);
+  background: var(--elah-bg-secondary);
+  flex: none;
+}
+.elah-toolbar button {
+  font-size: 10px;
+  line-height: 1;
+  padding: 4px 7px;
+  border: 1px solid var(--elah-border);
+  border-radius: 6px;
+  background: var(--elah-bg-card);
+  color: var(--elah-text-secondary);
+  cursor: pointer;
+}
+.elah-toolbar button:hover:not(:disabled) { color: var(--elah-accent-text); border-color: var(--elah-accent); }
+.elah-toolbar button:disabled { opacity: .4; cursor: default; }
+.elah-toolbar .elah-sep { width: 1px; height: 14px; background: var(--elah-border); margin: 0 3px; }
