@@ -4564,6 +4564,11 @@ function saveProject(projectId = currentProjectId) {
         
         selectedLayerId: state.selectedLayerId,
         groups: state.groups || [],
+
+        // Files library (uploads) — so scenes always trace back to real files
+        filesLibrary: (typeof FilesLib !== 'undefined') ? FilesLib.media.map(m => ({
+          id: m.id, name: m.name, type: m.type, dataURL: m.dataURL || null, linkedLayerId: m.linkedLayerId ?? null,
+        })) : [],
         
         // Animation settings
         animStyle: state.animStyle,
@@ -4795,6 +4800,28 @@ function loadProject(projectId) {
       
       // Update project name display
       updateProjectNameDisplay(project.name);
+
+      // Restore the Files library (uploads) so scenes trace back to real files
+      try {
+        if (Array.isArray(savedState.filesLibrary)) {
+          FilesLib.media = savedState.filesLibrary.map(m => ({
+            id: m.id, name: m.name, type: m.type, dataURL: m.dataURL, file: null, linkedLayerId: m.linkedLayerId ?? null,
+          }));
+          FilesLib._id = Math.max(0, ...FilesLib.media.map(m => m.id)) + 1;
+          FilesLib.sel.clear();
+          FilesLib.render();
+          // re-decode audio entries so the voiceover cut comes back after reload
+          const aud = FilesLib.media.find(m => m.type === 'audio' && m.dataURL);
+          if (aud) {
+            fetch(aud.dataURL).then(r => r.blob()).then(b => {
+              const f = new File([b], aud.name, { type: 'audio/mpeg' });
+              return AudioEngine.loadVoiceFile(f);
+            }).then(() => { Workspace.ensureVoiceCut(aud.name); Workspace.render(); })
+              .catch(() => {});
+          }
+          Workspace.videos = FilesLib.media.filter(m => m.type === 'video').map(m => ({ name: m.name, size: 0 }));
+        }
+      } catch (e) {}
       
       // Update topbar displays
       const sizeDisplay = document.getElementById('topbar-size-display');
@@ -4917,6 +4944,8 @@ async function createNewProject() {
   
   request.onsuccess = () => {
     const newId = request.result;
+    // fresh project → empty Files library
+    try { FilesLib.media = []; FilesLib.sel.clear(); FilesLib.render(); } catch (e) {}
     loadProject(newId);
     refreshProjectsList();
   };
@@ -11538,10 +11567,11 @@ try {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FILES LIBRARY v2 — uploads stay here as small cards; Use sends them to the
-// Workspace Manager. Nothing is auto-added to the project anymore.
+// Workspace Manager AND keeps them here marked as the scene they became.
+// Nothing appears in the Workspace unless it was uploaded here first.
 // ═══════════════════════════════════════════════════════════════════════════
 const FilesLib = {
-  media: [],          // {id, name, type:'image'|'audio'|'video', file, dataURL}
+  media: [],          // {id, name, type:'image'|'audio'|'video', file, dataURL, linkedLayerId}
   sel: new Set(),
   _id: 1,
 
@@ -11552,7 +11582,7 @@ const FilesLib = {
                  : f.type.startsWith('video/') ? 'video' : null;
       if (!type) continue;
       const entry = { id: this._id++, name: f.name.replace(/\.[^.]+$/, ''), type, file: f, dataURL: null };
-      if (type === 'image') entry.dataURL = await this._read(f);
+      entry.dataURL = await this._read(f);   // kept for persistence across reloads
       this.media.push(entry);
     }
     this.render();
@@ -11560,6 +11590,21 @@ const FilesLib = {
 
   _read(f) {
     return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); });
+  },
+
+  // Is this entry already in the workspace? (derived live so it survives
+  // scene deletion, reloads and undo)
+  isUsed(m) {
+    if (m.type === 'image')  return !!(m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId));
+    if (m.type === 'audio')  return Workspace.cuts.some(c => c.kind === 'voice' && c.name === m.name);
+    if (m.type === 'video')  return Workspace.videos.some(v => v.name === m.name);
+    return false;
+  },
+
+  sceneSeq(m) {
+    if (m.type !== 'image' || !m.linkedLayerId) return null;
+    const c = Workspace.cuts.find(c => c.kind === 'image' && c.layerId === m.linkedLayerId);
+    return c ? (c.seq || null) : null;
   },
 
   toggleSel(id) {
@@ -11570,8 +11615,11 @@ const FilesLib = {
   async useSelected() {
     const chosen = this.media.filter(m => this.sel.has(m.id));
     if (!chosen.length) return;
+    const fresh = chosen.filter(m => !this.isUsed(m));
+    const skipped = chosen.length - fresh.length;
+    if (!fresh.length) { showToast('Already in the Workspace'); this.sel.clear(); this.render(); return; }
     const imgs = [];
-    for (const m of chosen) {
+    for (const m of fresh) {
       if (m.type === 'image') {
         imgs.push(m);
       } else if (m.type === 'audio') {
@@ -11587,16 +11635,20 @@ const FilesLib = {
       const img = new Image();
       img.onload = () => {
         addLayer(img, m.name);
+        // link the file to the scene it created
+        const layer = state.layers[state.layers.length - 1];
+        if (layer && layer.name === m.name) m.linkedLayerId = layer.id;
         if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); }
       };
       img.onerror = () => { if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); } };
       img.src = m.dataURL;
     });
     if (!imgs.length) Workspace.renderAll();
-    this.media = this.media.filter(m => !this.sel.has(m.id));
     this.sel.clear();
     this.render();
-    showToast(`Sent ${chosen.length} file${chosen.length !== 1 ? 's' : ''} to the Workspace`);
+    showToast(skipped
+      ? `Sent ${fresh.length} file${fresh.length !== 1 ? 's' : ''} (${skipped} already in Workspace)`
+      : `Sent ${fresh.length} file${fresh.length !== 1 ? 's' : ''} to the Workspace`);
   },
 
   render() {
@@ -11608,28 +11660,49 @@ const FilesLib = {
 
     const CARD = 'border:1px solid var(--border);border-radius:8px;background:var(--panel);cursor:pointer;overflow:hidden;position:relative;';
     const cards = this.media.map(m => {
+      const used = this.isUsed(m);
+      const seq = this.sceneSeq(m);
       const thumb = m.type === 'image' && m.dataURL
-        ? `<img src="${m.dataURL}" style="width:100%;height:44px;object-fit:cover;display:block;">`
+        ? `<img src="${m.dataURL}" style="width:100%;height:44px;object-fit:cover;display:block;${used ? '' : 'opacity:.95;'}">`
         : `<div style="width:100%;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;">${m.type === 'audio' ? '🔊' : '🎬'}</div>`;
+      const badge = used
+        ? `<div style="position:absolute;top:2px;left:2px;font-size:8px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--accent);color:#fff;">${seq ? 'Scene ' + seq : '✓ in use'}</div>`
+        : '';
       return `<div onclick="FilesLib.toggleSel(${m.id})" title="${m.name}"
-        style="${CARD}${this.sel.has(m.id) ? 'outline:2px solid var(--accent);outline-offset:-2px;' : ''}">
-        ${thumb}
+        style="${CARD}${this.sel.has(m.id) ? 'outline:2px solid var(--accent);outline-offset:-2px;' : ''}${used ? 'opacity:.9;' : ''}">
+        ${thumb}${badge}
         <div style="font-size:9px;color:var(--muted-hi);padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</div>
         <button onclick="event.stopPropagation();FilesLib.remove(${m.id})"
           style="position:absolute;top:2px;right:2px;width:15px;height:15px;font-size:9px;line-height:13px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;">✕</button>
       </div>`;
     });
     list.innerHTML = cards.join('')
-      || '<div style="font-size:10px;color:var(--muted);">No files yet. Upload images, audio or video — they stay here until you press Use.</div>';
+      || '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;">No files yet. Upload images, audio or video — then select and press Use.</div>';
     list.style.display = 'grid';
     list.style.gridTemplateColumns = 'repeat(3, 1fr)';
     list.style.gap = '5px';
   },
 
   remove(id) {
-    this.media = this.media.filter(m => m.id !== id);
+    const m = this.media.find(x => x.id === id);
+    if (!m) return;
+    // a file that is in use takes its scene / cut with it
+    if (m.type === 'image' && m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId)) {
+      const cut = Workspace.cuts.find(c => c.kind === 'image' && c.layerId === m.linkedLayerId);
+      if (cut) Workspace.removeImageCut(cut.id); else removeLayer(m.linkedLayerId);
+    }
+    if (m.type === 'audio') {
+      const v = Workspace.cuts.find(c => c.kind === 'voice' && c.name === m.name);
+      if (v) Workspace.removeAudioCut(v.id);
+    }
+    if (m.type === 'video') {
+      Workspace.videos = Workspace.videos.filter(v => v.name !== m.name);
+    }
+    this.media = this.media.filter(x => x.id !== id);
     this.sel.delete(id);
     this.render();
+    Workspace.render(); Workspace.renderWM();
+    scheduleAutoSave();
   },
 };
 
