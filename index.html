@@ -3424,6 +3424,7 @@ input[type="number"]:focus { border-color: var(--accent); }
             style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">⏺ Record</button>
         </div>
         <input type="file" id="voice-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'voiceover'); this.value='';">
+        <div id="voice-list" style="margin-top:6px;"></div>
         <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Voiceovers added here are separate from background music</div>
       </div>
       <div>
@@ -3431,6 +3432,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         <button id="music-file-btn" onclick="document.getElementById('music-file-input').click()"
           style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload music</button>
         <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'music'); this.value='';">
+        <div id="music-list" style="margin-top:6px;"></div>
         <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Music added here stays separate from the voiceover</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -11986,8 +11988,10 @@ const FilesLib = {
                  : f.type.startsWith('audio/') ? 'audio'
                  : f.type.startsWith('video/') ? 'video' : null;
       if (!type) continue;
+      // audio picked in ＋ Add files lands under Background music automatically;
+      // the Voiceover upload / ⏺ Record buttons pass their own explicit role
       const entry = { id: this._id++, name: f.name.replace(/\.[^.]+$/, ''), type,
-                      role: type === 'audio' ? (role || 'voiceover') : null,
+                      role: type === 'audio' ? (role || 'music') : null,
                       file: f, dataURL: null, vol: 100 };
       entry.dataURL = await this._read(f);   // kept for persistence across reloads
       this.media.push(entry);
@@ -12187,7 +12191,7 @@ const FilesLib = {
     if (useBtn) useBtn.textContent = `Use ${this.sel.size ? `(${this.sel.size}) ` : ''}→ Workspace`;
 
     const CARD = 'border:1px solid var(--border);border-radius:8px;background:var(--panel);cursor:pointer;overflow:hidden;position:relative;';
-    const cards = this.media.map(m => {
+    const cardFor = m => {
       const used = this.isUsed(m);
       const seq = this.sceneSeq(m);
       const ROLE = { voiceover: '🎙 Voiceover', music: '🎵 Music', recording: '⏺ Recording' };
@@ -12207,44 +12211,68 @@ const FilesLib = {
         <button onclick="event.stopPropagation();FilesLib.remove(${m.id})"
           style="position:absolute;top:2px;right:2px;width:15px;height:15px;font-size:9px;line-height:13px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;">✕</button>
       </div>`;
-    });
-    const grid = inner => {
-      inner.innerHTML = cards.join('')
-        || '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;">No files yet. Upload images — and voiceover / music audio in their own sections — then press Use.</div>';
+    };
+
+    // AUDIO NEVER shows in the "Images & Video" grid — it lives under its own
+    // section (Voiceover / Background music), decided by how it was added
+    const imgCards   = this.media.filter(m => m.type !== 'audio').map(cardFor);
+    const voiceCards = this.media.filter(m => m.type === 'audio' && (m.role === 'voiceover' || m.role === 'recording')).map(cardFor);
+    const musicCards = this.media.filter(m => m.type === 'audio' && m.role === 'music').map(cardFor);
+
+    const grid = (inner, list, emptyMsg) => {
+      inner.innerHTML = list.join('')
+        || `<div style="font-size:10px;color:var(--muted);grid-column:1/-1;">${emptyMsg}</div>`;
       inner.style.display = 'grid';
       inner.style.gridTemplateColumns = 'repeat(3, 1fr)';
       inner.style.gap = '5px';
     };
     const list = document.getElementById('files-media-list');
-    if (list) grid(list);
+    if (list) grid(list, imgCards, 'No images or video yet. Audio picked in ＋ Add files goes to Background music automatically.');
+    const vList = document.getElementById('voice-list');
+    if (vList) { grid(vList, voiceCards, 'No voiceover yet — upload 📁 or record ⏺ above.'); this._appendEditor(vList, 'voice'); }
+    const mList = document.getElementById('music-list');
+    if (mList) { grid(mList, musicCards, 'No background music yet — upload 📁 above.'); this._appendEditor(mList, 'music'); }
+
     const wmView = document.getElementById('wm-files-view');
     if (wmView) {
-      grid(wmView);
-      // audio editor card opens below the grid in the Workspace Manager
-      const m = this.media.find(x => x.id === this._editAudioId);
-      if (m && m.type === 'audio') {
-        const cut = Workspace.cuts.find(c => c.kind === this._roleKind(m));
-        const label = m.role === 'music' ? '🎵 Background music' : m.role === 'recording' ? '⏺ Recording' : '🎙 Voiceover';
-        const dur = cut ? cut.dur.toFixed(1) + 's' : '—';
-        const ed = document.createElement('div');
-        ed.style.cssText = 'margin-top:8px;padding:8px;border:1px solid var(--border-hi);border-radius:8px;background:var(--panel);';
-        ed.innerHTML = `
-          <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted-hi);">
-            <span>${label}</span>
-            <span style="font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</span>
-            <span style="margin-left:auto;font-size:9px;color:var(--muted);">${dur}</span>
-            <button onclick="FilesLib.remove(${m.id});FilesLib._editAudioId=null;FilesLib.render()"
-              style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:7px;margin-top:7px;font-size:10px;color:var(--muted);">
-            <span style="flex-shrink:0;">Volume</span>
-            <input type="range" min="0" max="200" value="${m.vol ?? 100}" style="flex:1;"
-              oninput="FilesLib.setAudioVol(${m.id}, this.value); this.nextElementSibling.textContent = this.value + '%'">
-            <span style="width:34px;text-align:right;">${m.vol ?? 100}%</span>
-          </div>`;
-        wmView.appendChild(ed);
+      grid(wmView, imgCards, 'No images or video yet — add files in the Files card.');
+      // audio stays reachable inside the manager: a strip below the images grid
+      if (voiceCards.length || musicCards.length) {
+        const strip = document.createElement('div');
+        strip.style.marginTop = '8px';
+        wmView.appendChild(strip);
+        grid(strip, [...voiceCards, ...musicCards], '');
+        this._appendEditor(wmView, null);
       }
     }
+  },
+
+  // the per-audio editor card (role label, duration, volume, remove) —
+  // rendered inside the section that owns the audio
+  _appendEditor(container, roleGroup) {
+    const m = this.media.find(x => x.id === this._editAudioId);
+    if (!m || m.type !== 'audio') { if (this._editAudioId != null && !m) this._editAudioId = null; return; }
+    if (roleGroup === 'voice' && m.role === 'music') return;      // wrong section
+    if (roleGroup === 'music' && m.role !== 'music') return;      // wrong section
+    const cut = Workspace.cuts.find(c => c.kind === this._roleKind(m));
+    const label = m.role === 'music' ? '🎵 Background music' : m.role === 'recording' ? '⏺ Recording' : '🎙 Voiceover';
+    const dur = cut ? cut.dur.toFixed(1) + 's' : '—';
+    container.insertAdjacentHTML('beforeend', `
+      <div style="margin-top:8px;padding:8px;border:1px solid var(--border-hi);border-radius:8px;background:var(--panel);grid-column:1/-1;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted-hi);">
+          <span>${label}</span>
+          <span style="font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</span>
+          <span style="margin-left:auto;font-size:9px;color:var(--muted);">${dur}</span>
+          <button onclick="FilesLib.remove(${m.id});FilesLib._editAudioId=null;FilesLib.render()"
+            style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:7px;font-size:10px;color:var(--muted);">
+          <span style="flex-shrink:0;">Volume</span>
+          <input type="range" min="0" max="200" value="${m.vol ?? 100}" style="flex:1;"
+            oninput="FilesLib.setAudioVol(${m.id}, this.value); this.nextElementSibling.textContent = this.value + '%'">
+          <span style="width:34px;text-align:right;">${m.vol ?? 100}%</span>
+        </div>
+      </div>`);
   },
 
   remove(id) {
