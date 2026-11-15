@@ -4068,6 +4068,9 @@ input[type="number"]:focus { border-color: var(--accent); }
       #tl-play-btn { width:24px; height:18px; border:1px solid var(--border-hi); border-radius:5px;
         background:var(--panel); color:var(--muted-hi); font-size:10px; line-height:1; cursor:pointer; padding:0; }
       #tl-play-btn:hover { color:var(--accent); border-color:var(--accent); }
+      #tl-nudge-l, #tl-nudge-r { width:18px; height:18px; border:1px solid var(--border-hi); border-radius:5px;
+        background:var(--panel); color:var(--muted-hi); font-size:9px; line-height:1; cursor:pointer; padding:0; }
+      #tl-nudge-l:hover, #tl-nudge-r:hover { color:var(--accent); border-color:var(--accent); }
       .tl-row-del { position:absolute; right:1px; top:1px; width:14px; height:14px; font-size:9px; line-height:12px;
         border:none; background:none; color:var(--muted); cursor:pointer; padding:0; }
       .tl-row-del:hover { color:#ff5566; }
@@ -6433,6 +6436,104 @@ function _generateNow() {
   _runGroupAt(0);
 }
 
+// ─── DURATION MEASUREMENT (dry-run) ────────────────────────────────────────
+// Runs the layer's real drawing animation invisibly, frame by frame, and
+// counts the frames → the timeline gets the TRUE scene length the moment a
+// file is used, instead of a 4s guess that jumps around at first play.
+function measureLayerDuration(layer) {
+  if (!layer || !layer.img) return 0;
+  if (layer._measuredDur > 0) return layer._measuredDur;   // already measured
+  const S = state;
+  const snap = {
+    bgCanvas: S.bgCanvas, offscreen, done: S.done, playing: S.playing,
+    activeSlots: S._activeSlots, currentSlot: S._currentSlot, slotMode: S._slotMode,
+    animQueue: S._animQueue, queuePos: S._queuePos, animGroups: S._animGroups, groupPos: S._groupPos,
+    animStyle: S.animStyle, activeLayerIndex: S.activeLayerIndex,
+    strokeList: S.strokeList, strokeIdx: S.strokeIdx,
+    revealCanvas: S.revealCanvas, edgeCanvas: S.edgeCanvas,
+    ofOutlineCanvas: S.ofOutlineCanvas, ofColorCanvas: S.ofColorCanvas, ofPhase: S.ofPhase,
+    ofPerimIdx: S.ofPerimIdx, ofFillIdx: S.ofFillIdx, ofLastDrawn: S.ofLastDrawn,
+    ofColorGroups: S.ofColorGroups, ofColorIdx: S.ofColorIdx, ofWaypointIdx: S.ofWaypointIdx, ofRevealY: S.ofRevealY,
+    ifOutlineCanvas: S.ifOutlineCanvas, ifColorCanvas: S.ifColorCanvas, ifInkCanvas: S.ifInkCanvas,
+    ifPhase: S.ifPhase, ifPerimIdx: S.ifPerimIdx, ifLastDrawn: S.ifLastDrawn,
+    ifInkIdx: S.ifInkIdx, ifInkLastDrawn: S.ifInkLastDrawn, ifInkWaypoints: S.ifInkWaypoints,
+    ifInternalIdx: S.ifInternalIdx, ifInternalLast: S.ifInternalLast,
+    ifColorGroups: S.ifColorGroups, ifColorIdx: S.ifColorIdx, ifWaypointIdx: S.ifWaypointIdx, ifRevealY: S.ifRevealY,
+    stPhase: S.stPhase, stOutlineCanvas: S.stOutlineCanvas, stOutlinePts: S.stOutlinePts,
+    stOutlineIdx: S.stOutlineIdx, stOutlineLastDrawn: S.stOutlineLastDrawn, stFillPts: S.stFillPts,
+    contentBounds: S.contentBounds, dissolveBlocks: S.dissolveBlocks, dissolveIdx: S.dissolveIdx,
+    scribblePhase: S.scribblePhase, contourPhase: S.contourPhase, noFlashFinish: S.noFlashFinish,
+    _savedAnimStyle: S._savedAnimStyle, _savedHand: S._savedHand, _savedZigzag: S._savedZigzag,
+    curX: S.curX, curY: S.curY, scanDir: S.scanDir, tyLine: S.tyLine,
+    spiralAngle: S.spiralAngle, spiralR: S.spiralR, curtainX: S.curtainX,
+    hand: S.hand, zigzag: S.zigzag, textDrawStyle: S.textDrawStyle,
+    outlineDetect: S.outlineDetect, outlineAlgorithm: S.outlineAlgorithm,
+    outlineStrokeStyle: S.outlineStrokeStyle, colorStyle: S.colorStyle,
+    handDisplay: handCanvas.style.display,
+    badgeShown: document.getElementById('done-badge')?.classList.contains('show'),
+  };
+  try {
+    handCanvas.style.display = 'none';            // no ghost pen while measuring
+    const dry = document.createElement('canvas');
+    dry.width = S.canvasW; dry.height = S.canvasH;
+    const savedCtx = ctx;
+    ctx = dry.getContext('2d');                   // all drawing goes to the dry canvas
+    S.bgCanvas = null;                            // never bake into the real board
+    S._activeSlots = null; S._currentSlot = null; S._slotMode = false;
+    S._animQueue = null; S._animGroups = null;    // single-layer path, no chaining
+    S.done = false; S.playing = true;
+    S.activeLayerIndex = S.layers.indexOf(layer);
+    const style = layer.animStyle || S.animStyle || 'chunkjump';
+    S.animStyle = style;
+    preRender(null);                              // writes offscreen + contentBounds
+    setupStyle();
+    const speed = _cachedElements.speedSlider ? parseInt(_cachedElements.speedSlider.value) : 40;
+    let ticks = 0;
+    const MAX = 60 * 300;                         // hard cap: 5 minutes of animation
+    while (!S.done && ticks < MAX) {
+      switch (style) {
+        case 'contour':        AnimationEngine.tickContour(speed);      break;
+        case 'outlinefill':    AnimationEngine.tickOutlineFill(speed);  break;
+        case 'illustfill':     AnimationEngine.tickIllustFill(speed);   break;
+        case 'outlineonly':    AnimationEngine.tickOutlineOnly(speed);  break;
+        case 'chunkjump':      AnimationEngine.tickChunkJump(speed);    break;
+        case 'scribble':       AnimationEngine.tickScribble(speed);     break;
+        case 'spec-text':      AnimationEngine.tickSpecText(speed);     break;
+        case 'spec-human': case 'spec-animal': case 'spec-portrait':
+        case 'spec-vehicle': case 'spec-building': case 'spec-landscape':
+        case 'spec-spiral': case 'spec-nature':
+                               AnimationEngine.tickSpecialized(speed);  break;
+        default:               AnimationEngine.tickScanner(speed);      break;
+      }
+      ticks++;
+    }
+    const dur = Math.max(0.5, ticks / 60);        // engine ticks ≈ 60 frames/second
+    layer._measuredDur = dur;
+    return dur;
+  } catch (e) {
+    console.warn('duration measurement failed for', layer.name, e);
+    return 0;
+  } finally {
+    ctx = _mainCtx;                               // always restore the real ctx
+    offscreen = snap.offscreen;
+    S.bgCanvas = snap.bgCanvas;
+    for (const k of Object.keys(snap)) {
+      if (k === 'offscreen' || k === 'handDisplay' || k === 'badgeShown') continue;
+      S[k] = snap[k];
+    }
+    handCanvas.style.display = snap.handDisplay;
+    hctx.clearRect(0, 0, S.canvasW, S.canvasH);
+    sctx.clearRect(0, 0, S.canvasW, S.canvasH);
+    // the dry-run's finishAnim may have baked a stale outline overlay — clear it
+    try {
+      const ov = document.getElementById('outline-overlay');
+      if (ov) { ov.getContext('2d').clearRect(0, 0, ov.width, ov.height); ov.style.display = 'none'; }
+    } catch (e) {}
+    const badge = document.getElementById('done-badge');
+    if (badge) badge.classList.toggle('show', snap.badgeShown);
+  }
+}
+
 function _runGroupAt(gpos) {
   if (!state._animGroups || gpos >= state._animGroups.length) { _allLayersDone(); return; }
   state._groupPos = gpos;
@@ -6477,9 +6578,13 @@ function _runGroupAt(gpos) {
     state._revealFinalCanvas = null;
   }
 
-  // bgCanvas at this point already has all groups before gpos baked in (by finishAnim).
-  // For group 0 it is null, so we build a fresh one.
-  if (!state.bgCanvas) state.bgCanvas = _buildGroupBgCanvas(gpos);
+  // SCENE ISOLATION: every group is its own shot. Start from a fresh white
+  // page so the previous scene is REMOVED exactly when this one begins —
+  // back-to-back scenes join seamlessly; nothing accumulates on the board.
+  // (Layers that must appear together belong to one group = one scene.)
+  state.bgCanvas = document.createElement('canvas');
+  state.bgCanvas.width = state.canvasW; state.bgCanvas.height = state.canvasH;
+  fillBg(state.bgCanvas.getContext('2d'));
   const sharedBg = state.bgCanvas;
 
   // Build a slot for every layer in this group
@@ -7060,35 +7165,55 @@ function onDragEnd(e) {
 
 // ── Redraw all layers composited on canvas ──
 function redrawLayersOnCanvas() {
-  // Early exit if no layers to draw
-  if (!state.layers || state.layers.length === 0) {
-    fillBg(ctx);
-    return;
-  }
-  
+  // During playback the animation engine owns the board — never clobber a frame
+  if (state.playing) return;
+  // SCENE PREVIEW: the board is a video frame at the play line — it shows ONLY
+  // the scene under the playhead (fully drawn), never the whole layer stack.
+  // Scenes join one at a time, exactly like they play.
+  const members = _sceneLayersForPreview();
+  const list = members || state.layers;
+
   // Batch canvas operations for better performance
   ctx.save();
   fillBg(ctx);
-  
-  state.layers.forEach(layer => {
+
+  list.forEach(layer => {
     if (layer.visible === false) return;
     if (!layer.img) return; // Skip if image not loaded
     // Hide the layer being edited — the overlay textarea is the live preview
     if (_ts.active && _ts.editingId !== null && layer.id === _ts.editingId) return;
-    
+
     ctx.save();
     ctx.globalAlpha = (layer.opacity !== undefined) ? layer.opacity : 1;
-    
+
     // Use faster rendering for small images
     if (layer.w < 100 && layer.h < 100) {
       ctx.imageSmoothingEnabled = false;
     }
-    
+
     ctx.drawImage(layer.img, layer.x, layer.y, layer.w, layer.h);
     ctx.restore();
   });
-  
+
   ctx.restore();
+}
+
+// Which layers are on screen right now? The scene under the play line —
+// a group = every layer sharing the scene's animOrder (parallel rows of one
+// scene). With no timeline yet, fall back to the plain layer stack.
+function _sceneLayersForPreview() {
+  try {
+    if (typeof Workspace === 'undefined' || !Workspace.cuts || !Workspace.cuts.length) return null;
+    const t = Workspace.playT || 0;
+    const row0 = Workspace.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0)
+                               .sort((a, b) => a.start - b.start);
+    if (!row0.length) return null;
+    const host = row0.find(c => t >= c.start && t < c.start + c.dur) || row0[row0.length - 1];
+    const layer = state.layers.find(l => l.id === host.layerId);
+    if (!layer) return null;
+    const key = layer.animOrder ?? `__${layer.id}`;
+    return state.layers.filter(l => (l.animOrder ?? `__${l.id}`) === key);
+  } catch (e) { return null; }
 }
 
 // ── Selection handles on selectCanvas ──
@@ -8903,6 +9028,7 @@ function _commitTextLayer(text) {
     if (_editingId === null) {
       try { Workspace.placeLayerAtPlayhead(layer); } catch (e) {}
     }
+    measureLayerDuration(layer);   // true drawing length → correct cut length
     renderLayerList();
     selectLayer(id);
     redrawLayersOnCanvas();
@@ -11928,7 +12054,9 @@ const FilesLib = {
         Workspace.videos.push({ name: m.name, size: m.file ? m.file.size : 0 });
       }
     }
-    // images: create layers (auto-classified), then rebuild the timeline to scale
+    // images: create layers (auto-classified), MEASURE each scene's true
+    // length (dry-run, invisible), then rebuild the timeline to scale —
+    // the strip shows correct lengths from the start, no jumping at first play
     let pending = imgs.length;
     imgs.forEach(m => {
       const img = new Image();
@@ -11936,7 +12064,10 @@ const FilesLib = {
         addLayer(img, m.name);
         // link the file to the scene it created
         const layer = state.layers[state.layers.length - 1];
-        if (layer && layer.name === m.name) m.linkedLayerId = layer.id;
+        if (layer && layer.name === m.name) {
+          m.linkedLayerId = layer.id;
+          measureLayerDuration(layer);     // real animation length → cut length
+        }
         if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); }
       };
       img.onerror = () => { if (--pending === 0) { Workspace.rebuildFromLayers(); Workspace.renderAll(); } };
@@ -11951,11 +12082,14 @@ const FilesLib = {
   },
 
   // click on a used image card → edit its scene in the Workspace Manager
+  // (the play line jumps there too, so the board shows that scene)
   editScene(id) {
     const m = this.media.find(x => x.id === id);
     if (!m) return;
     if (m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId)) {
       selectLayer(m.linkedLayerId);
+      const cut = Workspace.cuts.find(c => c.kind === 'image' && c.layerId === m.linkedLayerId);
+      if (cut) { Workspace.setPlayheadTime(cut.start + Math.min(0.01, cut.dur / 2)); Workspace._staleAnim = true; }
       showToast(`Editing scene: ${m.name}`);
     }
   },
@@ -12308,12 +12442,16 @@ const Workspace = {
     rowsEl.innerHTML = html;
     empty.style.display = this.cuts.length ? 'none' : 'block';
 
-    // row labels — play/pause on top, ＋ below the first row, per-band icons
+    // row labels — play/pause on top (with ◀ ▶ play-line nudges), ＋ below the
+    // first row, per-band icons
     let lbl = `<div class="tl-row-label tl-label-head">
         <button id="tl-play-btn" title="Play / pause" onclick="togglePlay()">
           <span id="tl-play-ico" style="display:${state.playing ? 'none' : 'inline'}">▶</span>
           <span id="tl-pause-ico" style="display:${state.playing ? 'inline' : 'none'}">⏸</span>
-        </button></div>`;
+        </button>
+        <button id="tl-nudge-l" title="Play line back (hold to repeat)">◀</button>
+        <button id="tl-nudge-r" title="Play line forward (hold to repeat)">▶</button>
+      </div>`;
     for (let r = 0; r < nRows; r++) {
       const info = this._rowInfo(r);
       const kind = info.cat;
@@ -12327,6 +12465,24 @@ const Workspace = {
     labels.innerHTML = lbl;
     const addBtn = document.getElementById('tl-add-row');
     if (addBtn) addBtn.onclick = (ev) => { ev.stopPropagation(); this.showRowMenu(addBtn); };
+    // ◀ ▶ play-line nudges — click steps 0.25s, holding repeats
+    ['tl-nudge-l', 'tl-nudge-r'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      const step = id === 'tl-nudge-l' ? -0.25 : 0.25;
+      const nudge = () => { this.setPlayheadTime((this.playT || 0) + step); this._staleAnim = true; };
+      b.onmousedown = ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        if (b._nudgeRep) clearInterval(b._nudgeRep);      // never stack repeats
+        nudge();
+        b._nudgeRep = setInterval(nudge, 130);
+      };
+      const stop = () => { if (b._nudgeRep) { clearInterval(b._nudgeRep); b._nudgeRep = null; } };
+      b.onmouseup = stop; b.onmouseleave = stop;
+      // safety net: holding is always released, even if the pointer leaves mid-press
+      window.addEventListener('mouseup', stop);
+      window.addEventListener('blur', stop);
+    });
     labels.querySelectorAll('.tl-row-del').forEach(b => b.onclick = () => {
       const r = +b.dataset.row;
       const info = this._rowInfo(r);
@@ -12390,9 +12546,13 @@ const Workspace = {
     const up = ev => {
       clearTimeout(this._lpTimer);
       if (!this._lpFired) {
-        // plain click — select, unless this cut is already unlocked (then drag)
+        // plain click — select + jump the play line to this scene
         if (this.unlockedId === id) this._startMove(ev, c, el);
-        else if (c.kind === 'image' && c.layerId) selectLayer(c.layerId);
+        else if (c.kind === 'image' && c.layerId) {
+          selectLayer(c.layerId);
+          this.setPlayheadTime(c.start + Math.min(0.01, c.dur / 2));
+          this._staleAnim = true;
+        }
       }
       window.removeEventListener('mouseup', up);
     };
@@ -12506,18 +12666,11 @@ const Workspace = {
     const host = row0.find(c => t >= c.start && t < c.start + c.dur)
               || row0.find(c => c.start >= t) || row0[row0.length - 1];
     if (host && host.seq) gpos = Math.max(0, Math.min(host.seq - 1, state._animGroups.length - 1));
-    // bake the background + every scene before gpos into bgCanvas
+    // bake NOTHING from earlier scenes — every scene is its own shot on a
+    // fresh page; the board shows only what's under the play line
     state.bgCanvas = document.createElement('canvas');
     state.bgCanvas.width = state.canvasW; state.bgCanvas.height = state.canvasH;
-    const bc = state.bgCanvas.getContext('2d');
-    fillBg(bc);
-    for (let g = 0; g < gpos; g++) {
-      (state._animGroups[g] || []).forEach(l => {
-        if (l.visible === false) return;
-        bc.save(); bc.globalAlpha = l.opacity ?? 1;
-        bc.drawImage(l.img, l.x, l.y, l.w, l.h); bc.restore();
-      });
-    }
+    fillBg(state.bgCanvas.getContext('2d'));
     state._activeSlots = [];
     state._currentSlot = null;
     state._slotMode    = false;
@@ -12576,6 +12729,10 @@ const Workspace = {
     this._placePlayhead();
     const td = document.getElementById('time-display');
     if (td) td.textContent = this._fmt(this.playT);
+    // the board is a live frame-at-the-playline preview when not playing
+    if (!state.playing && typeof redrawLayersOnCanvas === 'function') {
+      try { redrawLayersOnCanvas(); } catch (e) {}
+    }
     // auto-pan while playing
     if (state.playing) {
       const sc = document.getElementById('tl-scroll');
