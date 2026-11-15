@@ -4566,9 +4566,12 @@ function saveProject(projectId = currentProjectId) {
         groups: state.groups || [],
 
         // Files library (uploads) — so scenes always trace back to real files
-        filesLibrary: (typeof FilesLib !== 'undefined') ? FilesLib.media.map(m => ({
-          id: m.id, name: m.name, type: m.type, dataURL: m.dataURL || null, linkedLayerId: m.linkedLayerId ?? null,
-        })) : [],
+        filesLibrary: (typeof FilesLib !== 'undefined') ? {
+          entries: FilesLib.media.map(m => ({
+            id: m.id, name: m.name, type: m.type, dataURL: m.dataURL || null, linkedLayerId: m.linkedLayerId ?? null,
+          })),
+          voiceEntryId: FilesLib._voiceEntryId ?? null,
+        } : { entries: [], voiceEntryId: null },
         
         // Animation settings
         animStyle: state.animStyle,
@@ -4803,15 +4806,19 @@ function loadProject(projectId) {
 
       // Restore the Files library (uploads) so scenes trace back to real files
       try {
-        if (Array.isArray(savedState.filesLibrary)) {
-          FilesLib.media = savedState.filesLibrary.map(m => ({
+        const lib = savedState.filesLibrary;
+        const entries = Array.isArray(lib) ? lib : (lib && lib.entries) || [];
+        if (entries.length) {
+          FilesLib.media = entries.map(m => ({
             id: m.id, name: m.name, type: m.type, dataURL: m.dataURL, file: null, linkedLayerId: m.linkedLayerId ?? null,
           }));
           FilesLib._id = Math.max(0, ...FilesLib.media.map(m => m.id)) + 1;
           FilesLib.sel.clear();
+          FilesLib._voiceEntryId = (!Array.isArray(lib) && lib.voiceEntryId) ? lib.voiceEntryId : null;
           FilesLib.render();
-          // re-decode audio entries so the voiceover cut comes back after reload
-          const aud = FilesLib.media.find(m => m.type === 'audio' && m.dataURL);
+          // re-decode the active voiceover so its green cut comes back after reload
+          const aud = FilesLib.media.find(m => m.type === 'audio' && m.id === FilesLib._voiceEntryId && m.dataURL)
+                   || FilesLib.media.find(m => m.type === 'audio' && m.dataURL);
           if (aud) {
             fetch(aud.dataURL).then(r => r.blob()).then(b => {
               const f = new File([b], aud.name, { type: 'audio/mpeg' });
@@ -4820,6 +4827,10 @@ function loadProject(projectId) {
               .catch(() => {});
           }
           Workspace.videos = FilesLib.media.filter(m => m.type === 'video').map(m => ({ name: m.name, size: 0 }));
+        } else {
+          FilesLib.media = [];
+          FilesLib._voiceEntryId = null;
+          FilesLib.render();
         }
       } catch (e) {}
       
@@ -4945,7 +4956,7 @@ async function createNewProject() {
   request.onsuccess = () => {
     const newId = request.result;
     // fresh project → empty Files library
-    try { FilesLib.media = []; FilesLib.sel.clear(); FilesLib.render(); } catch (e) {}
+    try { FilesLib.media = []; FilesLib.sel.clear(); FilesLib._voiceEntryId = null; FilesLib.render(); } catch (e) {}
     loadProject(newId);
     refreshProjectsList();
   };
@@ -11574,6 +11585,7 @@ const FilesLib = {
   media: [],          // {id, name, type:'image'|'audio'|'video', file, dataURL, linkedLayerId}
   sel: new Set(),
   _id: 1,
+  _voiceEntryId: null,   // which audio entry currently owns the voiceover track
 
   async addMedia(fileList) {
     for (const f of fileList) {
@@ -11596,7 +11608,8 @@ const FilesLib = {
   // scene deletion, reloads and undo)
   isUsed(m) {
     if (m.type === 'image')  return !!(m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId));
-    if (m.type === 'audio')  return Workspace.cuts.some(c => c.kind === 'voice' && c.name === m.name);
+    // one voiceover track at a time — the last-used audio file owns it
+    if (m.type === 'audio')  return this._voiceEntryId === m.id && Workspace.cuts.some(c => c.kind === 'voice');
     if (m.type === 'video')  return Workspace.videos.some(v => v.name === m.name);
     return false;
   },
@@ -11623,10 +11636,14 @@ const FilesLib = {
       if (m.type === 'image') {
         imgs.push(m);
       } else if (m.type === 'audio') {
-        await AudioEngine.loadVoiceFile(m.file);          // green voiceover cut
+        // after a reload only the dataURL survives — rebuild a File from it
+        const f = m.file || await fetch(m.dataURL).then(r => r.blob())
+          .then(b => new File([b], m.name, { type: 'audio/mpeg' }));
+        await AudioEngine.loadVoiceFile(f);              // green voiceover cut
         Workspace.ensureVoiceCut(m.name);
+        this._voiceEntryId = m.id;                        // this file owns the voice track
       } else if (m.type === 'video') {
-        Workspace.videos.push({ name: m.name, size: m.file.size });
+        Workspace.videos.push({ name: m.name, size: m.file ? m.file.size : 0 });
       }
     }
     // images: create layers (auto-classified), then rebuild the timeline to scale
@@ -11692,8 +11709,12 @@ const FilesLib = {
       if (cut) Workspace.removeImageCut(cut.id); else removeLayer(m.linkedLayerId);
     }
     if (m.type === 'audio') {
-      const v = Workspace.cuts.find(c => c.kind === 'voice' && c.name === m.name);
-      if (v) Workspace.removeAudioCut(v.id);
+      if (this._voiceEntryId === m.id) {
+        const v = Workspace.cuts.find(c => c.kind === 'voice');
+        if (v) Workspace.removeAudioCut(v.id);
+        AudioEngine.voiceBuf = null;
+        this._voiceEntryId = null;
+      }
     }
     if (m.type === 'video') {
       Workspace.videos = Workspace.videos.filter(v => v.name !== m.name);
