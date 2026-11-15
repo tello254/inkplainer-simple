@@ -11977,7 +11977,11 @@ const FilesLib = {
   _editAudioId: null,   // audio entry currently showing its editor card
 
   async addMedia(fileList, role) {
-    for (const f of fileList) {
+    // snapshot immediately: the <input> clears itself after onchange, and
+    // clearing an input's value EMPTIES its live FileList — a plain reference
+    // would lose every file after the first one
+    const files = Array.from(fileList || []);
+    for (const f of files) {
       const type = f.type.startsWith('image/') ? 'image'
                  : f.type.startsWith('audio/') ? 'audio'
                  : f.type.startsWith('video/') ? 'video' : null;
