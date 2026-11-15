@@ -3408,8 +3408,8 @@ input[type="number"]:focus { border-color: var(--accent); }
       <div>
         <div class="section-sublabel">Images &amp; Video</div>
         <button id="files-media-btn" onclick="document.getElementById('files-media-input').click()"
-          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">＋ Add files (images / audio / video)</button>
-        <input type="file" id="files-media-input" accept="image/*,audio/*,video/*" multiple style="display:none"
+          style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">＋ Add files (images / video)</button>
+        <input type="file" id="files-media-input" accept="image/*,video/*" multiple style="display:none"
           onchange="FilesLib.addMedia(this.files); this.value='';">
         <button id="files-use-btn" onclick="FilesLib.useSelected()" style="display:none;width:100%;margin-top:6px;
           font-size:11px;padding:6px;border:none;border-radius:7px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;">Use → Workspace</button>
@@ -3419,21 +3419,19 @@ input[type="number"]:focus { border-color: var(--accent); }
         <div class="section-sublabel">Voiceover</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <button id="voice-file-btn" onclick="document.getElementById('voice-file-input').click()"
-            style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload</button>
+            style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload voiceover</button>
           <button id="voice-rec-btn" onclick="AudioEngine.toggleRecord()"
             style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">⏺ Record</button>
-          <button onclick="AudioEngine.clearVoice()" title="Remove voiceover"
-            style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">✕</button>
         </div>
-        <input type="file" id="voice-file-input" accept="audio/*" style="display:none" onchange="AudioEngine.loadVoiceFile(this.files[0]); this.value='';">
-        <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">No voiceover — upload or record one</div>
+        <input type="file" id="voice-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'voiceover'); this.value='';">
+        <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Voiceovers added here are separate from background music</div>
       </div>
       <div>
         <div class="section-sublabel">Background music</div>
         <button id="music-file-btn" onclick="document.getElementById('music-file-input').click()"
           style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload music</button>
-        <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="AudioEngine.loadMusicFile(this.files[0]); this.value='';">
-        <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">No music — upload an audio file</div>
+        <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'music'); this.value='';">
+        <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Music added here stays separate from the voiceover</div>
       </div>
       <div style="font-size:10px;color:var(--muted);line-height:1.4;">
         Audio plays in sync when you play the animation. It is included in MP4 export (Chrome/Edge).
@@ -3510,6 +3508,7 @@ input[type="number"]:focus { border-color: var(--accent); }
     <div class="card-body" id="wm-body" style="flex-direction:column;gap:12px;">
       <!-- At runtime reorganizeSidebar moves the layers card (Add content bar +
            scenes list with Crop/Slice/Group) in here from the retired right panel -->
+      <div id="wm-files-view"></div>
     </div>
   </div>
 
@@ -4061,9 +4060,12 @@ input[type="number"]:focus { border-color: var(--accent); }
       #tl-labels .tl-label-head { height:22px; display:flex; align-items:center; justify-content:center; }
       .tl-row-label { height:30px; display:flex; align-items:center; justify-content:center;
         font-size:10px; color:var(--muted); border-bottom:1px solid var(--border); position:relative; }
-      #tl-add-row { width:24px; height:20px; border:1px solid var(--border-hi); border-radius:5px;
-        background:var(--panel); color:var(--muted-hi); font-size:12px; line-height:1; cursor:pointer; }
+      #tl-add-row { position:absolute; bottom:2px; right:2px; width:22px; height:16px; border:1px solid var(--border-hi); border-radius:5px;
+        background:var(--panel); color:var(--muted-hi); font-size:12px; line-height:1; cursor:pointer; padding:0; }
       #tl-add-row:hover { color:var(--accent); border-color:var(--accent); }
+      #tl-play-btn { width:24px; height:18px; border:1px solid var(--border-hi); border-radius:5px;
+        background:var(--panel); color:var(--muted-hi); font-size:10px; line-height:1; cursor:pointer; padding:0; }
+      #tl-play-btn:hover { color:var(--accent); border-color:var(--accent); }
       .tl-row-del { position:absolute; right:1px; top:1px; width:14px; height:14px; font-size:9px; line-height:12px;
         border:none; background:none; color:var(--muted); cursor:pointer; padding:0; }
       .tl-row-del:hover { color:#ff5566; }
@@ -4114,12 +4116,19 @@ input[type="number"]:focus { border-color: var(--accent); }
       (function () {
         const pb = document.getElementById('playbar');
         if (pb) pb.style.bottom = '158px';
-        // scrub: click empty timeline/ruler area → playhead moves there
+        // scrub: click empty timeline/ruler area → playhead moves there;
+        // double-click → hold and drag the playhead fast
         const tc = document.getElementById('tl-content');
-        if (tc) tc.addEventListener('click', e => {
-          if (e.target.closest('.tl-cut')) return;   // cuts handle their own clicks
-          if (typeof Workspace !== 'undefined' && Workspace.scrub) Workspace.scrub(e);
-        });
+        if (tc) {
+          tc.addEventListener('click', e => {
+            if (e.target.closest('.tl-cut')) return;   // cuts handle their own clicks
+            if (typeof Workspace !== 'undefined' && Workspace.scrub) Workspace.scrub(e);
+          });
+          tc.addEventListener('dblclick', e => {
+            if (e.target.closest('.tl-cut')) return;
+            if (typeof Workspace !== 'undefined' && Workspace.startPlayheadDrag) Workspace.startPlayheadDrag(e);
+          });
+        }
       })();
     </script>
   </div>
@@ -4296,7 +4305,7 @@ input[type="number"]:focus { border-color: var(--accent); }
     </div>
   </div>
 
-  <div id="layer-list-empty">
+  <div id="layer-list-empty" style="display:none;">
     <span class="empty-arrow">↑</span>
     Add files in Files → press Use → they appear here
   </div>
@@ -4568,10 +4577,11 @@ function saveProject(projectId = currentProjectId) {
         // Files library (uploads) — so scenes always trace back to real files
         filesLibrary: (typeof FilesLib !== 'undefined') ? {
           entries: FilesLib.media.map(m => ({
-            id: m.id, name: m.name, type: m.type, dataURL: m.dataURL || null, linkedLayerId: m.linkedLayerId ?? null,
+            id: m.id, name: m.name, type: m.type, role: m.role || null, vol: m.vol ?? 100,
+            dataURL: m.dataURL || null, linkedLayerId: m.linkedLayerId ?? null,
           })),
-          voiceEntryId: FilesLib._voiceEntryId ?? null,
-        } : { entries: [], voiceEntryId: null },
+          audioOwner: FilesLib._audioOwner || { voiceover: null, music: null, recording: null },
+        } : { entries: [], audioOwner: null },
         
         // Animation settings
         animStyle: state.animStyle,
@@ -4810,26 +4820,31 @@ function loadProject(projectId) {
         const entries = Array.isArray(lib) ? lib : (lib && lib.entries) || [];
         if (entries.length) {
           FilesLib.media = entries.map(m => ({
-            id: m.id, name: m.name, type: m.type, dataURL: m.dataURL, file: null, linkedLayerId: m.linkedLayerId ?? null,
+            id: m.id, name: m.name, type: m.type, role: m.role || null, vol: m.vol ?? 100,
+            dataURL: m.dataURL, file: null, linkedLayerId: m.linkedLayerId ?? null,
           }));
           FilesLib._id = Math.max(0, ...FilesLib.media.map(m => m.id)) + 1;
           FilesLib.sel.clear();
-          FilesLib._voiceEntryId = (!Array.isArray(lib) && lib.voiceEntryId) ? lib.voiceEntryId : null;
+          FilesLib._audioOwner = (lib && lib.audioOwner) ? lib.audioOwner : { voiceover: null, music: null, recording: null };
           FilesLib.render();
-          // re-decode the active voiceover so its green cut comes back after reload
-          const aud = FilesLib.media.find(m => m.type === 'audio' && m.id === FilesLib._voiceEntryId && m.dataURL)
-                   || FilesLib.media.find(m => m.type === 'audio' && m.dataURL);
-          if (aud) {
+          // re-decode owned audio entries so their cuts come back after reload
+          const auds = FilesLib.media.filter(m => m.type === 'audio' && FilesLib._audioOwner[m.role] === m.id && m.dataURL);
+          for (const aud of auds) {
             fetch(aud.dataURL).then(r => r.blob()).then(b => {
               const f = new File([b], aud.name, { type: 'audio/mpeg' });
-              return AudioEngine.loadVoiceFile(f);
-            }).then(() => { Workspace.ensureVoiceCut(aud.name); Workspace.render(); })
-              .catch(() => {});
+              return aud.role === 'music' ? AudioEngine.loadMusicFile(f) : AudioEngine.loadVoiceFile(f);
+            }).then(() => {
+              if (aud.role === 'music') Workspace.ensureMusicCut();
+              else if (aud.role === 'recording') Workspace.ensureRecCut(aud.name);
+              else Workspace.ensureVoiceCut(aud.name);
+              AudioEngine.applyEntryVols();
+              Workspace.render(); FilesLib.render();
+            }).catch(() => {});
           }
           Workspace.videos = FilesLib.media.filter(m => m.type === 'video').map(m => ({ name: m.name, size: 0 }));
         } else {
           FilesLib.media = [];
-          FilesLib._voiceEntryId = null;
+          FilesLib._audioOwner = { voiceover: null, music: null, recording: null };
           FilesLib.render();
         }
       } catch (e) {}
@@ -4956,7 +4971,7 @@ async function createNewProject() {
   request.onsuccess = () => {
     const newId = request.result;
     // fresh project → empty Files library
-    try { FilesLib.media = []; FilesLib.sel.clear(); FilesLib._voiceEntryId = null; FilesLib.render(); } catch (e) {}
+    try { FilesLib.media = []; FilesLib.sel.clear(); FilesLib._audioOwner = { voiceover: null, music: null, recording: null }; FilesLib._editAudioId = null; FilesLib.render(); } catch (e) {}
     loadProject(newId);
     refreshProjectsList();
   };
@@ -6628,7 +6643,7 @@ function renderLayerList() {
   const empty = document.getElementById('layer-list-empty');
   const count = document.getElementById('layer-count');
   count.textContent = `${state.layers.length} layer${state.layers.length!==1?'s':''}`;
-  empty.style.display = state.layers.length ? 'none' : 'block';
+  empty.style.display = 'none';   // retired empty-state hint (kept for compat)
   try {
     // keep timeline cuts in sync with the layer set (rebuild on add/remove/restore)
     const imgCutIds = Workspace.cuts.filter(c => c.kind === 'image').map(c => c.layerId).sort().join(',');
@@ -6685,6 +6700,7 @@ function renderLayerList() {
 
   setupLayerDrag();
   refreshLayerSliderVisuals(list);
+  try { if (typeof _wmApplyView === 'function') _wmApplyView(); } catch (e) {}
 }
 
 function _buildLayerItem(layer) {
@@ -7223,18 +7239,42 @@ function switchTab(m) {
   document.getElementById('text-panel').style.display  = m==='text' ?'block':'none';
   document.querySelectorAll('.input-card .tab-btn').forEach((b,i)=>
     b.classList.toggle('active',(i===0&&m==='image')||(i===1&&m==='text')));
-  // Workspace Manager views: 🖼 Files → scenes list; 🅣 Text → text tool only
-  const showLayers = m !== 'text';
-  const lph = document.querySelector('.layer-panel-header');
-  const lle = document.getElementById('layer-list-empty');
-  const ll  = document.getElementById('layer-list');
-  if (lph) lph.style.display = showLayers ? '' : 'none';
-  if (lle) lle.style.display = showLayers ? '' : 'none';
-  if (ll)  ll.style.display  = showLayers ? '' : 'none';
+  // Workspace Manager views: 🖼 Files → uploaded files (+ selected scene's
+  // editing card); 🅣 Text → text tool only
+  _wmApplyView();
   // Cancel text placement/editing when switching away from text tab
   if (m !== 'text') {
     deactivateTextPlacement();
     closeTextEditor(true);
+  }
+}
+
+// One view per Add-content mode — no duplicate scene-card lists
+function _wmApplyView() {
+  const wmView = document.getElementById('wm-files-view');
+  if (!wmView) return;
+  const lph = document.querySelector('.layer-panel-header');
+  const ll  = document.getElementById('layer-list');
+  if (state.mode === 'text') {
+    wmView.style.display = 'none';
+    if (lph) lph.style.display = 'none';
+    if (ll)  ll.style.display  = 'none';
+    return;
+  }
+  // Files mode: uploaded files are THE list; the editing card shows for the
+  // selected scene only
+  wmView.style.display = '';
+  try { FilesLib.render(); } catch (e) {}
+  const sel = state.selectedLayerId;
+  if (sel != null && ll) {
+    if (lph) lph.style.display = '';
+    ll.style.display = '';
+    ll.querySelectorAll('.layer-item').forEach(card => {
+      card.style.display = (+card.dataset.id === sel) ? '' : 'none';
+    });
+  } else {
+    if (lph) lph.style.display = 'none';
+    if (ll)  ll.style.display  = 'none';
   }
 }
 function selectColor(el) {
@@ -9113,7 +9153,21 @@ function restartAnim() {
 function startAnim()  { state.playing=true; updatePlayIcons(); AudioEngine.resumePreview(); animate(); }
 
 function togglePlay() {
-  if (state.done) { restartAnim(); return; }
+  if (state.done) {
+    // playhead somewhere before the end → replay from the play line
+    if (typeof Workspace !== 'undefined' && Workspace.startFromPlayhead &&
+        Workspace.playT < Workspace.totalDur() - 0.01) { Workspace.startFromPlayhead(); return; }
+    restartAnim(); return;
+  }
+  // fresh start (no animation loaded, or playhead moved since last play):
+  // begin at the playhead position
+  if (!state.playing && (!state._animGroups || (typeof Workspace !== 'undefined' && Workspace._staleAnim))) {
+    if (typeof Workspace !== 'undefined' && Workspace.startFromPlayhead) {
+      Workspace._staleAnim = false;
+      Workspace.startFromPlayhead();
+      return;
+    }
+  }
   state.playing=!state.playing; updatePlayIcons();
   if (state.playing) { AudioEngine.resumePreview(); animate(); }
   else AudioEngine.stopPreview();
@@ -9122,6 +9176,10 @@ function togglePlay() {
 function updatePlayIcons() {
   document.getElementById('play-icon').style.display  = state.playing?'none':'block';
   document.getElementById('pause-icon').style.display = state.playing?'block':'none';
+  // timeline mini play button
+  const tp = document.getElementById('tl-play-ico'), tq = document.getElementById('tl-pause-ico');
+  if (tp) tp.style.display = state.playing ? 'none' : 'inline';
+  if (tq) tq.style.display = state.playing ? 'inline' : 'none';
   if (state.done) { try { AudioEngine.stopPreview(); } catch (e) {} }
 }
 
@@ -11395,6 +11453,17 @@ const AudioEngine = {
     if (el) el.textContent = v + '%';
     this._musicVol = (v / 100) * 0.9;                       // remembered even before context exists
     if (this.musicGain) this.musicGain.gain.value = this._musicVol;
+    try { if (typeof FilesLib !== 'undefined') FilesLib.render(); } catch (e) {}
+  },
+
+  // Per-audio volume from each file's editor card (voiceover / music / recording)
+  applyEntryVols() {
+    if (!this.actx || typeof FilesLib === 'undefined') return;
+    const vo = FilesLib.media.find(m => m.type === 'audio' && FilesLib._audioOwner.voiceover === m.id)
+            || FilesLib.media.find(m => m.type === 'audio' && FilesLib._audioOwner.recording === m.id);
+    const mu = FilesLib.media.find(m => m.type === 'audio' && FilesLib._audioOwner.music === m.id);
+    if (this.voiceGain) this.voiceGain.gain.value = (vo?.vol ?? 100) / 100;
+    if (this.musicGain) this.musicGain.gain.value = (this._musicVol ?? 0.15) * ((mu?.vol ?? 100) / 100);
   },
 
   // ── Recording ──
@@ -11424,10 +11493,15 @@ const AudioEngine = {
       this._recStream.getTracks().forEach(t => t.stop());
       const blob = new Blob(this._recChunks, { type: this._mediaRec.mimeType || 'audio/webm' });
       try {
-        this.voiceBuf = await this.ensureCtx().decodeAudioData(await blob.arrayBuffer());
-        document.getElementById('voice-status').textContent =
-          `✅ Recording ready (${this._fmtDur(this.voiceBuf.duration)})`;
-        showToast('Recording saved as voiceover');
+        // recording = its own audio category — saved as a Files card, sent to
+        // the Workspace as a blue recording cut (never mixed with voiceover)
+        const ext = (blob.type.includes('webm') ? 'webm' : 'mp4');
+        const f = new File([blob], `Recording ${new Date().toLocaleTimeString()}`, { type: blob.type });
+        await FilesLib.addMedia([f], 'recording');
+        const entry = FilesLib.media[FilesLib.media.length - 1];
+        FilesLib.sel.add(entry.id);
+        await FilesLib.useSelected();
+        showToast('Recording saved — blue cut added to the timeline');
       } catch (e) {
         document.getElementById('voice-status').textContent = '⚠ Recording could not be decoded';
       }
@@ -11530,6 +11604,7 @@ const AudioEngine = {
     if (offset === 0) this._previewOffset = 0;
     if (!this.voiceBuf && !this.musicBuf) return;
     const actx = this.ensureCtx();
+    try { this.applyEntryVols(); } catch (e) {}
     if (this.voiceBuf) {
       this._voiceSrc = actx.createBufferSource();
       this._voiceSrc.buffer = this.voiceBuf;
@@ -11582,18 +11657,24 @@ try {
 // Nothing appears in the Workspace unless it was uploaded here first.
 // ═══════════════════════════════════════════════════════════════════════════
 const FilesLib = {
-  media: [],          // {id, name, type:'image'|'audio'|'video', file, dataURL, linkedLayerId}
+  media: [],          // {id, name, type:'image'|'audio'|'video', role, file, dataURL, linkedLayerId, vol}
   sel: new Set(),
   _id: 1,
-  _voiceEntryId: null,   // which audio entry currently owns the voiceover track
+  // which audio entry currently owns each audio track — decided by HOW the
+  // audio was added (voiceover upload / music upload / recording), never by
+  // guessing from the file contents
+  _audioOwner: { voiceover: null, music: null, recording: null },
+  _editAudioId: null,   // audio entry currently showing its editor card
 
-  async addMedia(fileList) {
+  async addMedia(fileList, role) {
     for (const f of fileList) {
       const type = f.type.startsWith('image/') ? 'image'
                  : f.type.startsWith('audio/') ? 'audio'
                  : f.type.startsWith('video/') ? 'video' : null;
       if (!type) continue;
-      const entry = { id: this._id++, name: f.name.replace(/\.[^.]+$/, ''), type, file: f, dataURL: null };
+      const entry = { id: this._id++, name: f.name.replace(/\.[^.]+$/, ''), type,
+                      role: type === 'audio' ? (role || 'voiceover') : null,
+                      file: f, dataURL: null, vol: 100 };
       entry.dataURL = await this._read(f);   // kept for persistence across reloads
       this.media.push(entry);
     }
@@ -11604,12 +11685,15 @@ const FilesLib = {
     return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); });
   },
 
+  // timeline cut kind for an audio role
+  _roleKind(m) { return m.role === 'music' ? 'music' : m.role === 'recording' ? 'record' : 'voice'; },
+
   // Is this entry already in the workspace? (derived live so it survives
   // scene deletion, reloads and undo)
   isUsed(m) {
     if (m.type === 'image')  return !!(m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId));
-    // one voiceover track at a time — the last-used audio file owns it
-    if (m.type === 'audio')  return this._voiceEntryId === m.id && Workspace.cuts.some(c => c.kind === 'voice');
+    if (m.type === 'audio')  return this._audioOwner[m.role] === m.id &&
+                               Workspace.cuts.some(c => c.kind === this._roleKind(m));
     if (m.type === 'video')  return Workspace.videos.some(v => v.name === m.name);
     return false;
   },
@@ -11639,9 +11723,30 @@ const FilesLib = {
         // after a reload only the dataURL survives — rebuild a File from it
         const f = m.file || await fetch(m.dataURL).then(r => r.blob())
           .then(b => new File([b], m.name, { type: 'audio/mpeg' }));
-        await AudioEngine.loadVoiceFile(f);              // green voiceover cut
-        Workspace.ensureVoiceCut(m.name);
-        this._voiceEntryId = m.id;                        // this file owns the voice track
+        // voiceover and recording share the engine's voice buffer — using one
+        // retires the other so the timeline never shows a stale track
+        if (m.role !== 'music' && this._audioOwner.voiceover && this._audioOwner.voiceover !== m.id) {
+          this._dropCut('voice');
+          this._audioOwner.voiceover = null;
+        }
+        if (m.role !== 'music' && this._audioOwner.recording && this._audioOwner.recording !== m.id) {
+          this._dropCut('record');
+          this._audioOwner.recording = null;
+        }
+        if (m.role === 'music') {
+          await AudioEngine.loadMusicFile(f);              // red music cut
+          Workspace.ensureMusicCut();
+          this._audioOwner.music = m.id;
+        } else if (m.role === 'recording') {
+          await AudioEngine.loadVoiceFile(f);
+          Workspace.ensureRecCut(m.name);                  // blue recording cut
+          this._audioOwner.recording = m.id;
+        } else {
+          await AudioEngine.loadVoiceFile(f);
+          Workspace.ensureVoiceCut(m.name);                // green voiceover cut
+          this._audioOwner.voiceover = m.id;
+        }
+        AudioEngine.applyEntryVols();
       } else if (m.type === 'video') {
         Workspace.videos.push({ name: m.name, size: m.file ? m.file.size : 0 });
       }
@@ -11668,9 +11773,36 @@ const FilesLib = {
       : `Sent ${fresh.length} file${fresh.length !== 1 ? 's' : ''} to the Workspace`);
   },
 
+  // click on a used image card → edit its scene in the Workspace Manager
+  editScene(id) {
+    const m = this.media.find(x => x.id === id);
+    if (!m) return;
+    if (m.linkedLayerId && state.layers.some(l => l.id === m.linkedLayerId)) {
+      selectLayer(m.linkedLayerId);
+      showToast(`Editing scene: ${m.name}`);
+    }
+  },
+
+  // click an audio card → its editor (per-audio: role, volume, remove)
+  editAudio(id) {
+    this._editAudioId = this._editAudioId === id ? null : id;
+    this.render();
+  },
+
+  setAudioVol(id, v) {
+    const m = this.media.find(x => x.id === id);
+    if (!m) return;
+    m.vol = Math.max(0, Math.min(200, +v || 0));
+    AudioEngine.applyEntryVols();
+    scheduleAutoSave();
+  },
+
+  _dropCut(kind) {
+    const c = Workspace.cuts.find(x => x.kind === kind);
+    if (c) Workspace.cuts = Workspace.cuts.filter(x => x.id !== c.id);
+  },
+
   render() {
-    const list = document.getElementById('files-media-list');
-    if (!list) return;
     const useBtn = document.getElementById('files-use-btn');
     if (useBtn) useBtn.style.display = this.sel.size ? 'block' : 'none';
     if (useBtn) useBtn.textContent = `Use ${this.sel.size ? `(${this.sel.size}) ` : ''}→ Workspace`;
@@ -11679,13 +11811,17 @@ const FilesLib = {
     const cards = this.media.map(m => {
       const used = this.isUsed(m);
       const seq = this.sceneSeq(m);
+      const ROLE = { voiceover: '🎙 Voiceover', music: '🎵 Music', recording: '⏺ Recording' };
       const thumb = m.type === 'image' && m.dataURL
         ? `<img src="${m.dataURL}" style="width:100%;height:44px;object-fit:cover;display:block;${used ? '' : 'opacity:.95;'}">`
-        : `<div style="width:100%;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;">${m.type === 'audio' ? '🔊' : '🎬'}</div>`;
+        : `<div style="width:100%;height:44px;display:flex;align-items:center;justify-content:center;font-size:16px;">${m.type === 'audio' ? (m.role === 'music' ? '🎵' : m.role === 'recording' ? '⏺' : '🎙') : '🎬'}</div>`;
       const badge = used
         ? `<div style="position:absolute;top:2px;left:2px;font-size:8px;font-weight:700;padding:1px 4px;border-radius:4px;background:var(--accent);color:#fff;">${seq ? 'Scene ' + seq : '✓ in use'}</div>`
-        : '';
-      return `<div onclick="FilesLib.toggleSel(${m.id})" title="${m.name}"
+        : (m.type === 'audio' ? `<div style="position:absolute;top:2px;left:2px;font-size:8px;font-weight:700;padding:1px 4px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;">${ROLE[m.role] || '🔊'}</div>` : '');
+      const click = m.type === 'image' && used ? `FilesLib.editScene(${m.id})`
+                  : m.type === 'audio' ? `FilesLib.editAudio(${m.id})`
+                  : `FilesLib.toggleSel(${m.id})`;
+      return `<div onclick="${click}" title="${m.name}"
         style="${CARD}${this.sel.has(m.id) ? 'outline:2px solid var(--accent);outline-offset:-2px;' : ''}${used ? 'opacity:.9;' : ''}">
         ${thumb}${badge}
         <div style="font-size:9px;color:var(--muted-hi);padding:3px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</div>
@@ -11693,11 +11829,43 @@ const FilesLib = {
           style="position:absolute;top:2px;right:2px;width:15px;height:15px;font-size:9px;line-height:13px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;padding:0;">✕</button>
       </div>`;
     });
-    list.innerHTML = cards.join('')
-      || '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;">No files yet. Upload images, audio or video — then select and press Use.</div>';
-    list.style.display = 'grid';
-    list.style.gridTemplateColumns = 'repeat(3, 1fr)';
-    list.style.gap = '5px';
+    const grid = inner => {
+      inner.innerHTML = cards.join('')
+        || '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;">No files yet. Upload images — and voiceover / music audio in their own sections — then press Use.</div>';
+      inner.style.display = 'grid';
+      inner.style.gridTemplateColumns = 'repeat(3, 1fr)';
+      inner.style.gap = '5px';
+    };
+    const list = document.getElementById('files-media-list');
+    if (list) grid(list);
+    const wmView = document.getElementById('wm-files-view');
+    if (wmView) {
+      grid(wmView);
+      // audio editor card opens below the grid in the Workspace Manager
+      const m = this.media.find(x => x.id === this._editAudioId);
+      if (m && m.type === 'audio') {
+        const cut = Workspace.cuts.find(c => c.kind === this._roleKind(m));
+        const label = m.role === 'music' ? '🎵 Background music' : m.role === 'recording' ? '⏺ Recording' : '🎙 Voiceover';
+        const dur = cut ? cut.dur.toFixed(1) + 's' : '—';
+        const ed = document.createElement('div');
+        ed.style.cssText = 'margin-top:8px;padding:8px;border:1px solid var(--border-hi);border-radius:8px;background:var(--panel);';
+        ed.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted-hi);">
+            <span>${label}</span>
+            <span style="font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.name}</span>
+            <span style="margin-left:auto;font-size:9px;color:var(--muted);">${dur}</span>
+            <button onclick="FilesLib.remove(${m.id});FilesLib._editAudioId=null;FilesLib.render()"
+              style="font-size:10px;border:none;background:none;color:var(--muted);cursor:pointer;">✕</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:7px;font-size:10px;color:var(--muted);">
+            <span style="flex-shrink:0;">Volume</span>
+            <input type="range" min="0" max="200" value="${m.vol ?? 100}" style="flex:1;"
+              oninput="FilesLib.setAudioVol(${m.id}, this.value); this.nextElementSibling.textContent = this.value + '%'">
+            <span style="width:34px;text-align:right;">${m.vol ?? 100}%</span>
+          </div>`;
+        wmView.appendChild(ed);
+      }
+    }
   },
 
   remove(id) {
@@ -11708,13 +11876,14 @@ const FilesLib = {
       const cut = Workspace.cuts.find(c => c.kind === 'image' && c.layerId === m.linkedLayerId);
       if (cut) Workspace.removeImageCut(cut.id); else removeLayer(m.linkedLayerId);
     }
-    if (m.type === 'audio') {
-      if (this._voiceEntryId === m.id) {
-        const v = Workspace.cuts.find(c => c.kind === 'voice');
-        if (v) Workspace.removeAudioCut(v.id);
-        AudioEngine.voiceBuf = null;
-        this._voiceEntryId = null;
-      }
+    if (m.type === 'audio' && this._audioOwner[m.role] === m.id) {
+      const kind = this._roleKind(m);
+      const cut = Workspace.cuts.find(c => c.kind === kind);
+      if (cut) Workspace.cuts = Workspace.cuts.filter(x => x.id !== cut.id);
+      if (kind === 'voice' || kind === 'record') AudioEngine.voiceBuf = null;
+      if (kind === 'music') AudioEngine.musicBuf = null;
+      this._audioOwner[m.role] = null;
+      if (this._editAudioId === id) this._editAudioId = null;
     }
     if (m.type === 'video') {
       Workspace.videos = Workspace.videos.filter(v => v.name !== m.name);
@@ -11806,6 +11975,17 @@ const Workspace = {
     this._ensureAudioRows();
   },
 
+  ensureRecCut(name) {
+    if (!AudioEngine.voiceBuf) return;
+    if (!this.cuts.some(c => c.kind === 'record')) {
+      this.cuts.push({ id: this.cutId++, kind: 'record', name: name || 'Recording', start: 0, dur: AudioEngine.voiceBuf.duration, row: -1, _moved: false });
+    } else {
+      const rc = this.cuts.find(c => c.kind === 'record');
+      rc.dur = AudioEngine.voiceBuf.duration;
+    }
+    this._ensureAudioRows();
+  },
+
   ensureMusicCut() {
     if (!AudioEngine.musicBuf) return;
     if (!this.cuts.some(c => c.kind === 'music')) {
@@ -11818,13 +11998,47 @@ const Workspace = {
   },
 
   _ensureAudioRows() {
-    // audio cuts get rows below the image rows (voice first, then music)
-    const a = this.cuts.filter(c => c.kind !== 'image');
-    a.forEach((c, i) => { if (c.row < 0 || c.row === undefined) c.row = this.imgRows + i; });
+    // audio cuts live in category bands below the image rows:
+    // voiceover first, then recording, then background music
+    const nVoice = this.cuts.filter(c => c.kind === 'voice').length  + this.extraRows.voice;
+    const nRec   = this.cuts.filter(c => c.kind === 'record').length + this.extraRows.record;
+    let base = this.imgRows;
+    ['voice', 'record', 'music'].forEach(kind => {
+      const n = kind === 'voice' ? nVoice : kind === 'record' ? nRec
+              : this.cuts.filter(c => c.kind === 'music').length + this.extraRows.music;
+      this.cuts.filter(c => c.kind === kind)
+        .sort((a, b) => (a.row ?? 999) - (b.row ?? 999))
+        .forEach((c, i) => { c.row = base + i; });
+      base += n;
+    });
   },
 
+  extraRows: { voice: 0, record: 0, music: 0 },   // empty lanes added via ＋
+
+  // Visual row layout: image rows first, then voiceover, recording, music bands
   rowCount() {
-    return Math.max(this.imgRows, ...this.cuts.map(c => (c.row ?? 0) + 1), 1);
+    const n = kind => this.cuts.filter(c => c.kind === kind).length;
+    return Math.max(1, this.imgRows
+      + n('voice')  + this.extraRows.voice
+      + n('record') + this.extraRows.record
+      + n('music')  + this.extraRows.music);
+  },
+
+  // Which category a visual row belongs to (and index within its band)
+  _rowInfo(r) {
+    const n = kind => this.cuts.filter(c => c.kind === kind).length;
+    if (r < this.imgRows) return { cat: 'image', idx: r };
+    r -= this.imgRows;
+    const bands = [
+      ['voice',  n('voice')  + this.extraRows.voice],
+      ['record', n('record') + this.extraRows.record],
+      ['music',  n('music')  + this.extraRows.music],
+    ];
+    for (const [cat, cnt] of bands) {
+      if (r < cnt) return { cat, idx: r };
+      r -= cnt;
+    }
+    return { cat: 'image', idx: 0 };
   },
 
   // Row-0 image cuts (sorted by start) define the sequence; parallel cuts
@@ -11874,7 +12088,7 @@ const Workspace = {
     }
     ruler.innerHTML = ticks;
 
-    // rows
+    // rows — laid out in category bands: images, voiceover, recording, music
     const nRows = this.rowCount();
     let html = '';
     for (let r = 0; r < nRows; r++) {
@@ -11886,30 +12100,38 @@ const Workspace = {
     rowsEl.innerHTML = html;
     empty.style.display = this.cuts.length ? 'none' : 'block';
 
-    // row labels (+ delete for empty parallel image rows)
-    let lbl = `<div class="tl-row-label tl-label-head"><button id="tl-add-row" title="Add a parallel row">＋</button></div>`;
+    // row labels — play/pause on top, ＋ below the first row, per-band icons
+    let lbl = `<div class="tl-row-label tl-label-head">
+        <button id="tl-play-btn" title="Play / pause" onclick="togglePlay()">
+          <span id="tl-play-ico" style="display:${state.playing ? 'none' : 'inline'}">▶</span>
+          <span id="tl-pause-ico" style="display:${state.playing ? 'inline' : 'none'}">⏸</span>
+        </button></div>`;
     for (let r = 0; r < nRows; r++) {
-      const kind = this.cuts.find(c => (c.row ?? 0) === r)?.kind || (r < this.imgRows ? 'image' : null);
+      const info = this._rowInfo(r);
+      const kind = info.cat;
       const icon = kind === 'voice' ? '🎙' : kind === 'music' ? '🎵' : kind === 'record' ? '⏺' : '🖼';
-      const canDel = r > 0 && r < this.imgRows && !this.cuts.some(c => (c.row ?? 0) === r);
-      lbl += `<div class="tl-row-label">${icon}${canDel ? `<button class="tl-row-del" data-row="${r}" title="Remove empty row">✕</button>` : ''}</div>`;
+      const hasCut = this.cuts.some(c => (c.row ?? 0) === r);
+      const canDel = !hasCut && (kind === 'image' ? r > 0 : true);
+      lbl += `<div class="tl-row-label">${icon}
+        ${r === 0 ? '<button id="tl-add-row" title="Add a row">＋</button>' : ''}
+        ${canDel ? `<button class="tl-row-del" data-row="${r}" title="Remove empty row">✕</button>` : ''}</div>`;
     }
     labels.innerHTML = lbl;
     const addBtn = document.getElementById('tl-add-row');
-    if (addBtn) addBtn.onclick = () => { this.imgRows++; this.render(); };
+    if (addBtn) addBtn.onclick = (ev) => { ev.stopPropagation(); this.showRowMenu(addBtn); };
     labels.querySelectorAll('.tl-row-del').forEach(b => b.onclick = () => {
       const r = +b.dataset.row;
+      const info = this._rowInfo(r);
       // shift rows below r up by one
       this.cuts.forEach(c => { if ((c.row ?? 0) > r) c.row--; });
-      this.imgRows--;
+      if (info.cat === 'image') this.imgRows--; else this.extraRows[info.cat]--;
       this.render(); this.renderWM();
     });
 
-    // attach cut interactions
+    // attach cut interactions (triple-click unlocks and moves a cut)
     rowsEl.querySelectorAll('.tl-cut').forEach(el => {
       const id = +el.dataset.id;
       el.addEventListener('mousedown', e => this._cutMouseDown(e, id, el));
-      el.addEventListener('dblclick', e => { e.stopPropagation(); this.toggleUnlock(id); });
     });
 
     // playhead position
@@ -11938,7 +12160,18 @@ const Workspace = {
     clearTimeout(this._lpTimer);
     const c = this.cuts.find(x => x.id === id);
     if (!c) return;
-    // Long-press 450ms unlocks and starts a move drag
+    // Triple-click (3 clicks within 600ms) unlocks and starts a move drag
+    const now = performance.now();
+    if (this._click && this._click.id === id && now - this._click.t < 600) this._click.n++;
+    else this._click = { id, n: 1, t: now };
+    if (this._click.n >= 3) {
+      this._click = null;
+      if (this.unlockedId !== id) { this.unlockedId = id; this.render(); }
+      const el2 = document.querySelector(`.tl-cut[data-id="${id}"]`) || el;
+      this._startMove(e, c, el2);
+      return;
+    }
+    // Long-press 450ms also unlocks and starts a move drag (touch-friendly)
     this._lpTimer = setTimeout(() => {
       this._lpFired = true;
       if (this.unlockedId !== id) { this.unlockedId = id; this.render(); }
@@ -11955,6 +12188,12 @@ const Workspace = {
       window.removeEventListener('mouseup', up);
     };
     window.addEventListener('mouseup', up);
+  },
+
+  // Overlap rule: two cuts may never share time on the same row
+  _overlaps(c, row, start) {
+    return this.cuts.some(o => o !== c && (o.row ?? 0) === row &&
+      start < o.start + o.dur && o.start < start + c.dur);
   },
 
   toggleUnlock(id) {
@@ -11976,27 +12215,25 @@ const Workspace = {
       // vertical: which row is the pointer over?
       const rowsEl = document.getElementById('tl-rows');
       const rect = rowsEl.getBoundingClientRect();
-      const r = Math.floor((ev.clientY - rect.top) / 30);
-      const kind = c.kind;
-      const rowKindOk = (row) => {
-        if (row < 0) return false;
-        if (kind === 'image') return row < this.imgRows;
-        return true; // audio can sit on any row below images is fine for now
-      };
-      if (rowKindOk(r) && r !== c.row) {
-        const target = this.cuts.find(o => o !== c && (o.row ?? 0) === r &&
-          c.start < o.start + o.dur && o.start < c.start + c.dur);
-        if (!target) c.row = r;
-      }
+      const r = Math.max(0, Math.floor((ev.clientY - rect.top) / 30));
+      // cuts only live in their own category band (images / voice / record / music)
+      const wantCat = c.kind === 'image' ? 'image' : c.kind;
+      if (this._rowInfo(r).cat === wantCat && r !== c.row && !this._overlaps(c, r, c.start)) c.row = r;
       this.render();
     };
     const up = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
       if (moved) {
-        c._moved = true;
-        pushUndoSnapshot();
-        this.syncAnimOrder();
+        // REJECT OVERLAP: a cut can never sit on top of another — snap back
+        if (this._overlaps(c, c.row ?? 0, c.start)) {
+          c.start = origStart; c.row = origRow;
+          showToast('That spot is taken — add a row with ＋ first');
+        } else {
+          c._moved = true;
+          pushUndoSnapshot();
+          this.syncAnimOrder();
+        }
         this.render(); this.renderWM();
         renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave();
       }
@@ -12005,12 +12242,119 @@ const Workspace = {
     window.addEventListener('mouseup', up);
   },
 
+  // ＋ button → choose which kind of row to add (rows never mix categories)
+  showRowMenu(anchor) {
+    const old = document.getElementById('tl-row-menu');
+    if (old) { old.remove(); return; }
+    const rect = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.id = 'tl-row-menu';
+    menu.style.cssText = 'position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--border-hi);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.4);padding:4px;min-width:150px;';
+    menu.innerHTML = [
+      ['image',  '🖼 Image row'],
+      ['voice',  '🎙 Voiceover row'],
+      ['record', '⏺ Recording row'],
+      ['music',  '🎵 Music row'],
+    ].map(([cat, label]) =>
+      `<div data-cat="${cat}" style="padding:7px 10px;font-size:11px;color:var(--muted-hi);cursor:pointer;border-radius:6px;">${label}</div>`).join('');
+    document.body.appendChild(menu);
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = Math.max(4, rect.left - 60) + 'px';
+    menu.querySelectorAll('[data-cat]').forEach(o => {
+      o.onmouseenter = () => o.style.background = 'rgba(255,255,255,.06)';
+      o.onmouseleave = () => o.style.background = '';
+      o.onclick = () => {
+        const cat = o.dataset.cat;
+        if (cat === 'image') this.imgRows++; else this.extraRows[cat]++;
+        menu.remove();
+        this.render();
+      };
+    });
+    const close = ev => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', close, true); } };
+    setTimeout(() => document.addEventListener('mousedown', close, true), 0);
+  },
+
+  // Start playback AT the playhead: scenes before it are shown already
+  // finished, then the scene under the play line animates next.
+  startFromPlayhead() {
+    if (!state.layers.length) return;
+    const t = this.playT || 0;
+    // rebuild groups from animOrder (same grouping generate() uses)
+    const allOrdered = getAnimOrder();
+    const groupMap = new Map();
+    allOrdered.forEach(layer => {
+      const key = layer.animOrder ?? `__${layer.id}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key).push(layer);
+    });
+    state._animGroups = [...groupMap.values()];
+    state._animQueue  = allOrdered;
+    state._queuePos   = 0;
+    // which group is under the playhead? (row-0 cuts carry the sequence)
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+    let gpos = 0;
+    const host = row0.find(c => t >= c.start && t < c.start + c.dur)
+              || row0.find(c => c.start >= t) || row0[row0.length - 1];
+    if (host && host.seq) gpos = Math.max(0, Math.min(host.seq - 1, state._animGroups.length - 1));
+    // bake the background + every scene before gpos into bgCanvas
+    state.bgCanvas = document.createElement('canvas');
+    state.bgCanvas.width = state.canvasW; state.bgCanvas.height = state.canvasH;
+    const bc = state.bgCanvas.getContext('2d');
+    fillBg(bc);
+    for (let g = 0; g < gpos; g++) {
+      (state._animGroups[g] || []).forEach(l => {
+        if (l.visible === false) return;
+        bc.save(); bc.globalAlpha = l.opacity ?? 1;
+        bc.drawImage(l.img, l.x, l.y, l.w, l.h); bc.restore();
+      });
+    }
+    state._activeSlots = [];
+    state._currentSlot = null;
+    state._slotMode    = false;
+    state._revealFinalCanvas = null;
+    state._dissolveMap = null;
+    state._animProgress = 0;
+    state.done = false;
+    state._groupDurs = state._groupDurs || [];
+    ctx = _mainCtx;
+    // paint the baked board immediately
+    fillBg(_mainCtx);
+    _mainCtx.drawImage(state.bgCanvas, 0, 0);
+    // audio plays from the playhead too (resumePreview continues from _previewOffset)
+    AudioEngine.stopPreview();
+    AudioEngine._previewOffset = t;
+    AudioEngine.startPreview(t);
+    state.playing = true;
+    updatePlayIcons();
+    window._runGroupAt(gpos);
+  },
+
   // Scrub: click empty timeline → playhead moves there
-  scrub(e) {
-    const content = document.getElementById('tl-content');
+  scrub(e) {    const content = document.getElementById('tl-content');
     const rect = content.getBoundingClientRect();
     const t = Math.max(0, (e.clientX - rect.left) / this.PXS);
     this.setPlayheadTime(t);
+    this._staleAnim = true;   // next Play starts from the playhead position
+  },
+
+  // Double-click the timeline → hold and drag the playhead fast
+  startPlayheadDrag(e) {
+    const content = document.getElementById('tl-content');
+    const rect = () => content.getBoundingClientRect();
+    let r = rect();
+    const move = ev => {
+      const t = Math.max(0, (ev.clientX - r.left) / this.PXS);
+      this.setPlayheadTime(t);
+      this._staleAnim = true;
+      r = rect();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    move(e);
   },
 
   setPlayheadTime(t) {
@@ -12072,7 +12416,18 @@ const Workspace = {
   },
 
   // ── Workspace Manager (sidebar dropdown) ──
-  renderAll() { this.render(); renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave(); },
+  // The dropdown opens itself once the workspace has something in it
+  ensureWmOpen() {
+    const wmCard = document.getElementById('card-workspace-mgr');
+    if (!wmCard || typeof FilesLib === 'undefined') return;
+    const hasContent = FilesLib.media.length > 0 || state.layers.length > 0 || this.cuts.length > 0;
+    if (hasContent && wmCard.classList.contains('collapsed')) {
+      wmCard.classList.remove('collapsed');
+      if (state.mode !== 'text') { try { switchTab('image'); } catch (e) {} }
+    }
+  },
+
+  renderAll() { this.render(); renderLayerList(); redrawLayersOnCanvas(); scheduleAutoSave(); this.ensureWmOpen(); },
 
   renderWM() {
     const wrap = document.getElementById('wm-groups');
@@ -12129,8 +12484,12 @@ const Workspace = {
   removeAudioCut(id) {
     pushUndoSnapshot();
     const c = this.cuts.find(x => x.id === id);
-    if (c?.kind === 'voice') { try { AudioEngine.clearVoice(); } catch (e) {} }
+    if (c?.kind === 'voice' || c?.kind === 'record') { try { AudioEngine.clearVoice(); } catch (e) {} }
     if (c?.kind === 'music') { try { AudioEngine.clearMusic(); } catch (e) {} }
+    if (c && typeof FilesLib !== 'undefined') {
+      const role = c.kind === 'voice' ? 'voiceover' : c.kind === 'record' ? 'recording' : 'music';
+      if (FilesLib._audioOwner[role] != null) FilesLib._audioOwner[role] = null;
+    }
     this.cuts = this.cuts.filter(x => x.id !== id);
     this.render(); this.renderWM();
   },

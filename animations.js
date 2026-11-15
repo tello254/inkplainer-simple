@@ -1892,10 +1892,20 @@ function _tickAllSlots() {
 
     const nextGroup = (state._groupPos ?? 0) + 1;
     if (nextGroup < (state._animGroups || []).length) {
+      // Scene transition: 0s when cuts touch, gap length when there's space
+      let delay = 0;
+      try {
+        const WS = window.Workspace;
+        if (WS && WS.cuts) {
+          const row0 = WS.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+          const cur = row0[state._groupPos ?? 0], nxt = row0[nextGroup];
+          if (cur && nxt) delay = Math.max(0, nxt.start - (cur.start + cur.dur)) * 1000;
+        }
+      } catch (e) {}
       // Use the live, maintained _runGroupAt (window-scoped, defined in index.html) —
       // not this file's own closure-local copy, which is kept only for standalone use
       // of animations.js and has fallen behind the current implementation.
-      setTimeout(() => window._runGroupAt(nextGroup), 200);
+      setTimeout(() => window._runGroupAt(nextGroup), delay);
     } else {
       // Same reasoning: use the live, maintained _allLayersDone.
       window._allLayersDone();
