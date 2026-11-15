@@ -3508,10 +3508,8 @@ input[type="number"]:focus { border-color: var(--accent); }
       <span class="card-chevron">▾</span>
     </div>
     <div class="card-body" id="wm-body" style="flex-direction:column;gap:12px;">
-      <div id="wm-empty" style="font-size:10px;color:var(--muted);line-height:1.5;">
-        Select files in <b>Files</b>, then press <b>Use</b> to send them here.<br>Images become numbered cuts on the timeline below.
-      </div>
-      <div id="wm-groups"></div>
+      <!-- At runtime reorganizeSidebar moves the layers card (Add content bar +
+           scenes list with Crop/Slice/Group) in here from the retired right panel -->
     </div>
   </div>
 
@@ -4192,7 +4190,7 @@ input[type="number"]:focus { border-color: var(--accent); }
     <div id="image-panel" style="display:none">
       <input type="file" id="file-input" accept="image/*" multiple style="display:none">
       <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5;">
-        Images are added from the <b>Files</b> card in the left sidebar.
+        Your scenes (images &amp; video) are listed below — click one to edit or animate it. New files come from the <b>Files</b> card → <b>Use</b>.
       </div>
     </div>
     <!-- TEXT PANEL -->
@@ -7183,8 +7181,16 @@ function switchTab(m) {
   state.mode = m;
   document.getElementById('image-panel').style.display = m==='image'?'block':'none';
   document.getElementById('text-panel').style.display  = m==='text' ?'block':'none';
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>
+  document.querySelectorAll('.input-card .tab-btn').forEach((b,i)=>
     b.classList.toggle('active',(i===0&&m==='image')||(i===1&&m==='text')));
+  // Workspace Manager views: 🖼 Files → scenes list; 🅣 Text → text tool only
+  const showLayers = m !== 'text';
+  const lph = document.querySelector('.layer-panel-header');
+  const lle = document.getElementById('layer-list-empty');
+  const ll  = document.getElementById('layer-list');
+  if (lph) lph.style.display = showLayers ? '' : 'none';
+  if (lle) lle.style.display = showLayers ? '' : 'none';
+  if (ll)  ll.style.display  = showLayers ? '' : 'none';
   // Cancel text placement/editing when switching away from text tab
   if (m !== 'text') {
     deactivateTextPlacement();
@@ -8766,6 +8772,10 @@ function _commitTextLayer(text) {
       state.layers.push(layer);
     }
     fitCanvas();
+    // New text layers land in the timeline at the playhead position
+    if (_editingId === null) {
+      try { Workspace.placeLayerAtPlayhead(layer); } catch (e) {}
+    }
     renderLayerList();
     selectLayer(id);
     redrawLayersOnCanvas();
@@ -11950,6 +11960,16 @@ const Workspace = {
     for (let g = 0; g < gpos; g++) t += durs[g] || 4;
     t += (performance.now() - (state._groupT0 || performance.now())) / 1000;
     this.setPlayheadTime(t);
+  },
+
+  // Drop a new layer into the sequence at the playhead: it joins the group of
+  // the cut under the playhead, so the text animates together with that scene.
+  placeLayerAtPlayhead(layer) {
+    const t = this.playT || 0;
+    const row0 = this.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+    if (!row0.length) { layer.animOrder = 1; return; }
+    const host = row0.find(c => t >= c.start && t < c.start + c.dur) || row0[row0.length - 1];
+    layer.animOrder = host.seq;
   },
 
   _fmt(s) {
