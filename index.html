@@ -768,6 +768,9 @@ body {
   opacity: 1;
 }
 .card.collapsed .card-body { max-height: 0; opacity: 0; padding-bottom: 0; overflow: hidden; }
+/* Settings card: flex body + taller budget for the Drawing subsection */
+#card-settings .card-body { display: flex; flex-direction: column; gap: 12px; }
+#card-settings:not(.collapsed) .card-body { max-height: 5000px; }
 
 /* ── Generate button (inside sidebar, after cards) ── */
 #btn-generate {
@@ -3443,7 +3446,7 @@ input[type="number"]:focus { border-color: var(--accent); }
       <div class="card-header-label">All Settings</div>
       <span class="card-chevron">▾</span>
     </div>
-    <div class="card-body" id="settings-body" style="display:none;flex-direction:column;gap:12px;">
+    <div class="card-body" id="settings-body" style="flex-direction:column;gap:12px;">
 
       <!-- Hand movement toggle moves here -->
       <div id="settings-handglide-slot"></div>
