@@ -3433,6 +3433,13 @@ input[type="number"]:focus { border-color: var(--accent); }
         <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'music'); this.value='';">
         <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Music added here stays separate from the voiceover</div>
       </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <button onclick="FilesLib.backupProject()" title="Save this whole project — scenes, timeline and uploaded files — as a file on your computer"
+          style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">⬇ Backup project</button>
+        <button onclick="document.getElementById('backup-restore-input').click()" title="Bring back a project from a backup file"
+          style="font-size:10px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">⬆ Restore</button>
+        <input type="file" id="backup-restore-input" accept=".json,application/json" style="display:none" onchange="FilesLib.restoreBackup(this)">
+      </div>
       <div style="font-size:10px;color:var(--muted);line-height:1.4;">
         Audio plays in sync when you play the animation. It is included in MP4 export (Chrome/Edge).
       </div>
@@ -11986,6 +11993,63 @@ const FilesLib = {
 
   _read(f) {
     return new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(f); });
+  },
+
+  // ── BACKUP / RESTORE ─────────────────────────────────────────────────────
+  // Browser storage can be wiped (private mode, cleanup, browser reset).
+  // A backup is a normal file on the user's computer — it survives anything.
+  async backupProject() {
+    try {
+      saveProject();                                   // flush the latest state
+      await new Promise(res => setTimeout(res, 800));  // let the write land
+      const dbp = await new Promise(res => { const rq = indexedDB.open('WhiteboardAnimatorDB', 1); rq.onsuccess = () => res(rq.result); });
+      const rec = await new Promise(res => { const tx = dbp.transaction('projects', 'readonly'); const rq = tx.objectStore('projects').get(currentProjectId); rq.onsuccess = () => res(rq.result); });
+      if (!rec || !rec.state) { showToast('Nothing to back up yet'); return; }
+      const json = JSON.stringify({ app: 'inkplainer-simple', version: 1, project: rec });
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (rec.name || 'project').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + '-backup.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      showToast('⬇ Backup downloaded — keep the file somewhere safe');
+    } catch (e) {
+      console.error('backup failed', e);
+      showToast('⚠️ Backup failed');
+    }
+  },
+
+  async restoreBackup(input) {
+    const f = input.files && input.files[0];
+    input.value = '';
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const rec = data.project || data;                // accept wrapped or raw records
+      if (!rec || !rec.state) { showToast('⚠️ That is not a backup file'); return; }
+      const rec2 = {
+        name: rec.name || 'Restored project',
+        createdAt: rec.createdAt || new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        state: rec.state,
+      };
+      const newId = await new Promise((res, rej) => {
+        const rq = indexedDB.open('WhiteboardAnimatorDB', 1);
+        rq.onsuccess = () => {
+          const tx = rq.result.transaction('projects', 'readwrite');
+          const put = tx.objectStore('projects').add(rec2);   // fresh id, never overwrites
+          put.onsuccess = () => res(put.result);
+          put.onerror = () => rej(put.error);
+        };
+        rq.onerror = () => rej(rq.error);
+      });
+      loadProject(newId);
+      try { refreshProjectsList(); } catch (e) {}
+      showToast('⬆ Backup restored: ' + rec2.name);
+    } catch (e) {
+      console.error('restore failed', e);
+      showToast('⚠️ Restore failed — is this a backup file?');
+    }
   },
 
   // timeline cut kind for an audio role
