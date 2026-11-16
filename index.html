@@ -2111,23 +2111,46 @@ input[type="number"]:focus { border-color: var(--accent); }
 }
 
 /* ═══════════════════════════════════════════
-   PLAYBAR
+   THIN FULL-VIDEO PREVIEW STRIP
 ═══════════════════════════════════════════ */
-#playbar {
+#video-preview {
   position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.96);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border-hi);
-  border-radius: 100px;
-  padding: 8px 16px;
+  bottom: 152px;
+  left: 10px;
+  right: 10px;
+  height: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 320px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.1), 0 1px 4px rgba(0,0,0,0.06);
+  gap: 8px;
+  cursor: pointer;
+  z-index: 6;
+  color: var(--muted);
+  font-size: 10px;
+  transition: border-color .15s, color .15s;
+}
+#video-preview:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+#video-preview #play-icon,
+#video-preview #pause-icon { flex-shrink: 0; opacity: .9; }
+#video-preview .vp-label { flex-shrink: 0; letter-spacing: .3px; user-select: none; }
+#vp-track {
+  flex: 1;
+  height: 3px;
+  background: var(--border-hi);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#vp-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 2px;
 }
 
 .play-btn {
@@ -3425,7 +3448,7 @@ input[type="number"]:focus { border-color: var(--accent); }
         </div>
         <input type="file" id="voice-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'voiceover'); this.value='';">
         <div id="voice-list" style="margin-top:6px;"></div>
-        <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Voiceovers added here are separate from background music</div>
+        <div id="voice-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;"></div>
       </div>
       <div>
         <div class="section-sublabel">Background music</div>
@@ -3433,7 +3456,7 @@ input[type="number"]:focus { border-color: var(--accent); }
           style="font-size:11px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;color:var(--muted-hi);">📁 Upload music</button>
         <input type="file" id="music-file-input" accept="audio/*" style="display:none" onchange="FilesLib.addMedia(this.files, 'music'); this.value='';">
         <div id="music-list" style="margin-top:6px;"></div>
-        <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;">Music added here stays separate from the voiceover</div>
+        <div id="music-status" style="font-size:10px;color:var(--muted);margin-top:5px;line-height:1.4;"></div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <button onclick="FilesLib.backupProject()" title="Save this whole project — scenes, timeline and uploaded files — as a file on your computer"
@@ -4043,21 +4066,13 @@ input[type="number"]:focus { border-color: var(--accent); }
       <button class="crop-cancel-btn" onclick="cancelCrop()">Cancel</button>
       <button class="crop-confirm-btn" onclick="confirmCrop()">✓ Apply Crop</button>
     </div>
-    <div id="playbar">
-      <button class="restart-btn" onclick="restartAnim()" title="Restart">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="1 4 1 10 7 10"/>
-          <path d="M3.51 15a9 9 0 1 0 .49-4.29"/>
-        </svg>
-      </button>
-      <button class="play-btn" id="play-pause-btn" onclick="togglePlay()" disabled>
-        <svg id="play-icon"  width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-        <svg id="pause-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-      </button>
-      <div id="progress-track" onclick="seekAnim(event)">
-        <div id="progress-fill"></div>
-      </div>
-      <span id="time-display">0%</span>
+    <!-- Thin full-video preview strip (replaces the old play-bar capsule):
+         click = plays the WHOLE video, all scenes one after another -->
+    <div id="video-preview" onclick="playWholeVideo()" title="Play the whole video — all scenes, one after another">
+      <svg id="play-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      <svg id="pause-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <span class="vp-label">Full video preview</span>
+      <div id="vp-track"><div id="vp-fill"></div></div>
     </div>
 
     <!-- ════════ TIMELINE v2 (to-scale cut timeline, CapCut-style) ════════ -->
@@ -4071,9 +4086,6 @@ input[type="number"]:focus { border-color: var(--accent); }
       #tl-labels .tl-label-head { height:22px; display:flex; align-items:center; justify-content:center; }
       .tl-row-label { height:30px; display:flex; align-items:center; justify-content:center;
         font-size:10px; color:var(--muted); border-bottom:1px solid var(--border); position:relative; }
-      #tl-add-row { position:absolute; bottom:2px; right:2px; width:22px; height:16px; border:1px solid var(--border-hi); border-radius:5px;
-        background:var(--panel); color:var(--muted-hi); font-size:12px; line-height:1; cursor:pointer; padding:0; }
-      #tl-add-row:hover { color:var(--accent); border-color:var(--accent); }
       #tl-play-btn { width:24px; height:18px; border:1px solid var(--border-hi); border-radius:5px;
         background:var(--panel); color:var(--muted-hi); font-size:10px; line-height:1; cursor:pointer; padding:0; }
       #tl-play-btn:hover { color:var(--accent); border-color:var(--accent); }
@@ -4114,14 +4126,11 @@ input[type="number"]:focus { border-color: var(--accent); }
       #timeline.elah-on #tl-empty,
       #timeline.elah-on #tl-playhead { display:none !important; }
       #tl-empty { position:absolute; top:30px; left:16px; font-size:10px; color:var(--muted); }
-      /* Slim playbar capsule */
-      #playbar { padding:4px 12px; min-width:240px; gap:8px; bottom:158px; }
-      #playbar .play-btn svg { width:14px; height:14px; }
       .progress-bar { height:4px; }
     </style>
     <div id="timeline">
       <div id="tl-labels">
-        <div class="tl-row-label"><button id="tl-add-row" title="Add a parallel row">＋</button></div>
+        <div class="tl-row-label"></div>
       </div>
       <div id="tl-scroll">
         <div id="tl-content">
@@ -4760,7 +4769,7 @@ function loadProject(projectId) {
         Workspace._restoring = true;
         const tl = savedState.timeline;
         if (tl) {
-          Workspace.imgRows = Math.max(1, tl.imgRows || 1);
+          Workspace.imgRows = Math.max(1, tl.imgRows || 4);
           Workspace.extraRows = { voice: 0, record: 0, music: 0, ...(tl.extraRows || {}) };
           Workspace.cutId = Math.max(1, tl.cutId || 1);
           if (Array.isArray(tl.cuts)) {
@@ -4768,6 +4777,12 @@ function loadProject(projectId) {
             Workspace.cuts = tl.cuts.filter(c =>
               c.kind !== 'image' || (c.layerId != null && savedLayerIds.has(c.layerId)));
           }
+        } else {
+          // project without a saved timeline (fresh/new): default layout
+          Workspace.imgRows = 4;
+          Workspace.extraRows = { voice: 0, record: 0, music: 0 };
+          Workspace.cutId = 1;
+          Workspace.cuts = [];
         }
       } catch (e) { try { Workspace._restoring = false; } catch (e2) {} }
       if (savedState.layers && savedState.layers.length > 0) {
@@ -5012,6 +5027,7 @@ async function createNewProject() {
     canvasBg: { type: 'solid', val: '#ffffff' },
     _currentRatio: '16:9',
     _currentRes: 720,
+    imgRows: 4,
     animStyle: 'chunkjump',
     hand: 'custom2',
     layers: [],
@@ -6012,18 +6028,13 @@ let offscreen = null;
 const _cachedElements = {
   speedSlider: null,
   handSpeedSlider: null,
-  canvasSizeDisplay: null,
-  playPauseBtn: null,
-  progressFill: null,
-  timeDisplay: null
+  canvasSizeDisplay: null
 };
 
 function _cacheElements() {
   _cachedElements.speedSlider = document.getElementById('speed-slider');
   _cachedElements.handSpeedSlider = document.getElementById('hand-speed-slider');
   _cachedElements.canvasSizeDisplay = document.getElementById('canvas-size-display');
-  _cachedElements.playPauseBtn = document.getElementById('play-pause-btn');
-  _cachedElements.progressFill = document.getElementById('progress-fill');
   _cachedElements.timeDisplay = document.getElementById('time-display');
 }
 
@@ -6411,7 +6422,30 @@ function _isDrawingGeneration() {
 
 function generate() {
   if (state.layers.length === 0) { showToast('Upload at least one image first'); return; }
+  // Generate Animation = preview ONLY the scene under the playhead.
+  // (The full video has its own thin preview strip above the timeline.)
+  try {
+    const row0 = Workspace.cuts.filter(c => c.kind === 'image' && (c.row ?? 0) === 0).sort((a, b) => a.start - b.start);
+    const t = Workspace.playT || 0;
+    const host = row0.find(c => t >= c.start && t < c.start + c.dur)
+              || row0.find(c => c.start >= t) || row0[row0.length - 1];
+    Workspace._stopAfterGroup = (host && host.seq) ? Math.max(0, host.seq - 1) : null;
+  } catch (e) { try { Workspace._stopAfterGroup = null; } catch (e2) {} }
   // Hand images load on demand; make sure they are ready before the first frame
+  preloadCurrentHands().then(_generateStart);
+}
+
+// Thin strip above the timeline: plays the WHOLE video — every scene,
+// one after another — starting from a fresh board at scene 1.
+function playWholeVideo() {
+  if (state.layers.length === 0) { showToast('Upload at least one image first'); return; }
+  try {
+    if (typeof Workspace !== 'undefined') {
+      Workspace._stopAfterGroup = null;
+      Workspace._staleAnim = false;
+      Workspace.setPlayheadTime(0);
+    }
+  } catch (e) {}
   preloadCurrentHands().then(_generateStart);
 }
 
@@ -6456,6 +6490,34 @@ function _generateNow() {
   });
   state._animGroups = [...groupMap.values()];
   state._groupPos   = 0;
+
+  // Single-scene preview (Generate button): start at the scene under the
+  // playhead on a fresh board, and stop when that scene finishes.
+  const stopG = (typeof Workspace !== 'undefined' && Workspace._stopAfterGroup != null)
+    ? Workspace._stopAfterGroup : null;
+  if (stopG != null && stopG < state._animGroups.length && stopG > 0) {
+    state._groupDurs = state._groupDurs || [];
+    state._groupPos  = stopG;
+    const t = (typeof Workspace !== 'undefined') ? (Workspace.playT || 0) : 0;
+    try {
+      Workspace._playOriginT = t;
+      Workspace._playOriginG = stopG;
+      AudioEngine.stopPreview();
+      AudioEngine._previewOffset = t;
+      AudioEngine.startPreview(t);
+    } catch (e) {}
+    state.playing = true;
+    updatePlayIcons();
+    _runGroupAt(stopG);
+    return;
+  }
+  // Full run (or scene 1): playhead follows from 0
+  try {
+    if (typeof Workspace !== 'undefined') { Workspace._playOriginG = null; Workspace._playOriginT = null; }
+  } catch (e) {}
+  if (stopG != null && stopG >= state._animGroups.length) {
+    try { Workspace._stopAfterGroup = null; } catch (e) {}
+  }
 
   _runGroupAt(0);
 }
@@ -6560,6 +6622,13 @@ function measureLayerDuration(layer) {
 
 function _runGroupAt(gpos) {
   if (!state._animGroups || gpos >= state._animGroups.length) { _allLayersDone(); return; }
+  // Single-scene preview: once the previewed scene has finished, stop here —
+  // the next scene always starts on a fresh (cleared) board anyway.
+  if (gpos > 0 && typeof Workspace !== 'undefined' && Workspace._stopAfterGroup != null
+      && gpos > Workspace._stopAfterGroup) {
+    _allLayersDone();
+    return;
+  }
   state._groupPos = gpos;
   // Timeline instrumentation: record previous group's real duration + stamp this group's start
   try {
@@ -6691,7 +6760,6 @@ function _runGroupAt(gpos) {
   offscreen = state._activeSlots[state._activeSlots.length - 1]?.offscreen ?? offscreen;
 
   sctx.clearRect(0, 0, state.canvasW, state.canvasH);
-  document.getElementById('play-pause-btn').disabled = false;
   document.getElementById('done-badge').classList.remove('show');
   setProgress(0);
   startAnim();
@@ -6759,7 +6827,6 @@ function _allLayersDone() {
 
   if (!shouldReveal) {
     _snap();
-    document.getElementById('play-pause-btn').disabled = true;
     document.getElementById('done-badge').classList.add('show');
     document.getElementById('anim-style-label').textContent = '';
     state.done = true;
@@ -6776,7 +6843,6 @@ function _allLayersDone() {
     const el = (Date.now() - start) / dur;
     if (el >= 1) {
       _snap();
-      document.getElementById('play-pause-btn').disabled = true;
       document.getElementById('done-badge').classList.add('show');
       document.getElementById('anim-style-label').textContent = '';
       state.done = true;
@@ -9261,7 +9327,8 @@ function setupStyle() {
 function setProgress(ratio) {
   state._animProgress = Math.min(ratio, 1);
   const pct=Math.round(state._animProgress*100);
-  document.getElementById('progress-fill').style.width=pct+'%';
+  const pf = document.getElementById('vp-fill');
+  if (pf) pf.style.width=pct+'%';
   // time-display shows the TIMELINE clock (m:ss, owned by the playhead) —
   // writing scene progress % here fought with it every frame
 }
@@ -9345,7 +9412,7 @@ function resetAnim() {
 function restartAnim() {
   // full replay from zero — forget any playhead origin
   try { if (typeof Workspace !== 'undefined') { Workspace._playOriginG = null; Workspace._playOriginT = null; } } catch (e) {}
-  if (state.layers.length > 0) { generate(); return; }
+  if (state.layers.length > 0) { playWholeVideo(); return; }
   if (!offscreen) return;
   resetAnim(); setupStyle(); startAnim();
 }
@@ -9528,7 +9595,6 @@ function seekAnim(e) {
   if (h>0) ctx.drawImage(offscreen, cb.x,cb.y, cb.w,h, cb.x,cb.y, cb.w,h);
   hctx.clearRect(0,0,state.canvasW,state.canvasH);
 }
-document.getElementById('progress-track').addEventListener('click', seekAnim);
 
 // ─── HAND DRAWING ───
 function drawHand(c,tipX,tipY,dir,style) {
@@ -11706,12 +11772,12 @@ const AudioEngine = {
 
   clearVoice() {
     this.voiceBuf = null;
-    document.getElementById('voice-status').textContent = 'No voiceover — upload or record one';
+    document.getElementById('voice-status').textContent = '';
   },
 
   clearMusic() {
     this.musicBuf = null;
-    document.getElementById('music-status').textContent = 'No music — upload an audio file';
+    document.getElementById('music-status').textContent = '';
   },
 
   setMusicVolume(v) {
@@ -12276,7 +12342,7 @@ const FilesLib = {
       inner.style.gap = '5px';
     };
     const list = document.getElementById('files-media-list');
-    if (list) grid(list, imgCards, 'No images or video yet. Audio picked in ＋ Add files goes to Background music automatically.');
+    if (list) grid(list, imgCards, 'No images or video yet.');
     const vList = document.getElementById('voice-list');
     if (vList) { grid(vList, voiceCards, 'No voiceover yet — upload 📁 or record ⏺ above.'); this._appendEditor(vList, 'voice'); }
     const mList = document.getElementById('music-list');
@@ -12284,13 +12350,18 @@ const FilesLib = {
 
     const wmView = document.getElementById('wm-files-view');
     if (wmView) {
-      grid(wmView, imgCards, 'No images or video yet — add files in the Files card.');
-      // audio stays reachable inside the manager: a strip below the images grid
-      if (voiceCards.length || musicCards.length) {
+      // Workspace Manager = what is IN the workspace. A file appears here only
+      // after it was selected in the Files card and sent via Use → Workspace.
+      const usedImgs  = this.media.filter(m => m.type !== 'audio' && this.isUsed(m)).map(cardFor);
+      const usedVoice = this.media.filter(m => m.type === 'audio' && (m.role === 'voiceover' || m.role === 'recording') && this.isUsed(m)).map(cardFor);
+      const usedMusic = this.media.filter(m => m.type === 'audio' && m.role === 'music' && this.isUsed(m)).map(cardFor);
+      grid(wmView, usedImgs, 'Nothing in the workspace yet — select files above, then press Use → Workspace.');
+      // used audio stays reachable inside the manager: a strip below the images grid
+      if (usedVoice.length || usedMusic.length) {
         const strip = document.createElement('div');
         strip.style.marginTop = '8px';
         wmView.appendChild(strip);
-        grid(strip, [...voiceCards, ...musicCards], '');
+        grid(strip, [...usedVoice, ...usedMusic], '');
         this._appendEditor(wmView, null);
       }
     }
@@ -12361,7 +12432,7 @@ const Workspace = {
   PXS: 60,                       // px per second — THE calibration constant
   cuts: [],                      // {id, kind:'image'|'voice'|'record'|'music', layerId, name, start, dur, row, _moved}
   cutId: 1,
-  imgRows: 1,                    // parallel image rows
+  imgRows: 4,                    // parallel image cut rows (available by default; auto-grows if ever needed)
   selId: null,
   unlockedId: null,
   videos: [],                    // video files sent from Files
@@ -12639,18 +12710,15 @@ const Workspace = {
       const hasCut = this.cuts.some(c => (c.row ?? 0) === r);
       const canDel = !hasCut && (kind === 'image' ? r > 0 : true);
       lbl += `<div class="tl-row-label">${icon}
-        ${r === 0 ? '<button id="tl-add-row" title="Add a row">＋</button>' : ''}
         ${canDel ? `<button class="tl-row-del" data-row="${r}" title="Remove empty row">✕</button>` : ''}</div>`;
     }
     labels.innerHTML = lbl;
-    const addBtn = document.getElementById('tl-add-row');
-    if (addBtn) addBtn.onclick = (ev) => { ev.stopPropagation(); this.showRowMenu(addBtn); };
     // ◀ ▶ play-line nudges — click steps 0.25s, holding repeats
     ['tl-nudge-l', 'tl-nudge-r'].forEach(id => {
       const b = document.getElementById(id);
       if (!b) return;
       const step = id === 'tl-nudge-l' ? -0.25 : 0.25;
-      const nudge = () => { this.setPlayheadTime((this.playT || 0) + step); this._staleAnim = true; };
+      const nudge = () => { this._centerPH = true; this.setPlayheadTime((this.playT || 0) + step); this._staleAnim = true; };
       b.onmousedown = ev => {
         ev.preventDefault(); ev.stopPropagation();
         if (b._nudgeRep) clearInterval(b._nudgeRep);      // never stack repeats
@@ -12791,43 +12859,11 @@ const Workspace = {
     window.addEventListener('mouseup', up);
   },
 
-  // ＋ button → choose which kind of row to add (rows never mix categories)
-  showRowMenu(anchor) {
-    const old = document.getElementById('tl-row-menu');
-    if (old) { old.remove(); return; }
-    const rect = anchor.getBoundingClientRect();
-    const menu = document.createElement('div');
-    menu.id = 'tl-row-menu';
-    menu.style.cssText = 'position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--border-hi);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.4);padding:4px;min-width:150px;';
-    menu.innerHTML = [
-      ['image',  '🖼 Image row'],
-      ['voice',  '🎙 Voiceover row'],
-      ['record', '⏺ Recording row'],
-      ['music',  '🎵 Music row'],
-    ].map(([cat, label]) =>
-      `<div data-cat="${cat}" style="padding:7px 10px;font-size:11px;color:var(--muted-hi);cursor:pointer;border-radius:6px;">${label}</div>`).join('');
-    document.body.appendChild(menu);
-    menu.style.top = (rect.bottom + 4) + 'px';
-    menu.style.left = Math.max(4, rect.left - 60) + 'px';
-    menu.querySelectorAll('[data-cat]').forEach(o => {
-      o.onmouseenter = () => o.style.background = 'rgba(255,255,255,.06)';
-      o.onmouseleave = () => o.style.background = '';
-      o.onclick = () => {
-        const cat = o.dataset.cat;
-        if (cat === 'image') this.imgRows++; else this.extraRows[cat]++;
-        menu.remove();
-        this._ensureAudioRows();      // re-seat audio cuts into their (shifted) bands
-        this.render();
-      };
-    });
-    const close = ev => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', close, true); } };
-    setTimeout(() => document.addEventListener('mousedown', close, true), 0);
-  },
-
   // Start playback AT the playhead: scenes before it are shown already
   // finished, then the scene under the play line animates next.
   startFromPlayhead() {
     if (!state.layers.length) return;
+    this._stopAfterGroup = null;   // play-from-playline is a full run from here
     const t = this.playT || 0;
     // rebuild groups from animOrder (same grouping generate() uses)
     const allOrdered = getAnimOrder();
@@ -12911,6 +12947,12 @@ const Workspace = {
     if (td) td.textContent = this._fmt(this.playT);
     // drive the elah island's playhead (playback clock is ours)
     try { if (window.__elahPush && window.__elahReady) window.__elahPush.seek(this.playT); } catch (e) {}
+    // keep the white play line centered while it moves on its own — autoplay,
+    // or the ◀ ▶ nudge buttons. Mouse scrubs/drag never re-center.
+    if (state.playing || this._centerPH) {
+      this._centerPH = false;
+      try { if (window.__elahCenter && window.__elahReady) window.__elahCenter(); } catch (e) {}
+    }
     // the board is a live frame-at-the-playline preview when not playing
     if (!state.playing && typeof redrawLayersOnCanvas === 'function') {
       try { redrawLayersOnCanvas(); } catch (e) {}
@@ -12943,6 +12985,7 @@ const Workspace = {
         this._doneRebuilt = true;
         try { this.rebuildFromLayers(); this.render(); } catch (e) {}
       }
+      this._centerPH = true;   // keep the end of the video in view too
       this.setPlayheadTime(this.totalDur());
       return;
     }

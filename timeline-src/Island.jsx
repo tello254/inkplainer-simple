@@ -173,6 +173,29 @@ function Bridge({ tlRef }) {
       zoomFit: () => { try { tlRef.current?.fitToWindow?.() } catch (e) {} },
     }
 
+    // Keep the white play line centered in the strip: during autoplay (and when
+    // the vanilla ◀ ▶ nudge buttons move the play line) the lane scrolls left
+    // under the needle at whatever pace the play line moves. Mouse scrubs are
+    // never hijacked — vanilla only calls this while playing or on nudges.
+    window.__elahCenter = () => {
+      try {
+        const root = document.querySelector('#elah-mount [data-elah-timeline-root]')
+        if (!root) return
+        const sc = [...root.children].find(c => c.tagName === 'DIV' && c.style.overflow === 'auto')
+        if (!sc) return
+        const pb = usePlaybackStore.getState()
+        const sidebar = 110                      // island sidebarWidth (matches <Timeline sidebarWidth>)
+        const laneW = sc.clientWidth - sidebar   // visible lane area
+        if (laneW <= 0) return
+        // center of the lane in viewport coords; the sidebar term cancels out:
+        // scrollLeft = (sidebar + f·zoom) − (sidebar + laneW/2)
+        const target = Math.round(pb.currentFrame * pb.zoom - laneW / 2)
+        const max = sc.scrollWidth - sc.clientWidth
+        const clamped = Math.max(0, Math.min(target, max))
+        if (Math.abs(sc.scrollLeft - clamped) > 1) sc.scrollLeft = clamped
+      } catch (e) {}
+    }
+
     // debug/automation hook (also used by tests)
     window.__elahDebug = {
       engine: () => engine,
